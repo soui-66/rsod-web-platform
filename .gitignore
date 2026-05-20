@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 *.pt
+!backend/yolo11n.pt
 *.pth
 *.onnx
 .venv/
