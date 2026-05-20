@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pt
+*.pth
+*.onnx
+.venv/
+venv/
+env/
+*.db
+
+# 数据库存储
+storage/
+
+# 静态文件
+backend/static/
+
+# Node.js
+node_modules/
+dist/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
