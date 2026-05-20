@@ -35,7 +35,7 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 os.makedirs(os.path.join(BASE_DIR, "static"), exist_ok=True)
 
-model = YOLO("yolo11n.pt")
+model = YOLO("runs/detect/best_model.pt")
 
 
 @app.on_event("startup")
