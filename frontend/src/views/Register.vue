@@ -1,18 +1,18 @@
 <template>
-  <div class="login-page">
-    <div class="login-container">
-      <div class="login-header">
+  <div class="register-page">
+    <div class="register-container">
+      <div class="register-header">
         <div class="logo-icon">🛰️</div>
         <h1>遥感目标识别平台</h1>
         <p>多场景影像·精准识别</p>
       </div>
 
       <el-form
-        class="login-form"
+        class="register-form"
         :model="form"
         :rules="rules"
         ref="formRef"
-        @submit.prevent="handleLogin"
+        @submit.prevent="handleRegister"
       >
         <el-form-item prop="username">
           <el-input
@@ -34,20 +34,31 @@
           />
         </el-form-item>
 
+        <el-form-item prop="confirmPassword">
+          <el-input
+            v-model="form.confirmPassword"
+            type="password"
+            placeholder="请确认密码"
+            size="large"
+            prefix-icon="Lock"
+            show-password
+          />
+        </el-form-item>
+
         <el-button
           type="primary"
           size="large"
-          class="login-btn"
+          class="register-btn"
           :loading="loading"
-          @click="handleLogin"
+          @click="handleRegister"
         >
-          登 录
+          注 册
         </el-button>
       </el-form>
 
-      <div class="login-footer">
-        <p>默认账号：admin / admin123</p>
-        <p class="register-link">还没有账号？<a href="/register">立即注册</a></p>
+      <div class="register-footer">
+        <span>已有账号？</span>
+        <a href="/login" class="link">立即登录</a>
       </div>
     </div>
   </div>
@@ -65,14 +76,34 @@ const loading = ref(false);
 const form = reactive({
   username: "",
   password: "",
+  confirmPassword: "",
 });
 
 const rules = {
-  username: [{ required: true, message: "请输入用户名", trigger: "blur" }],
-  password: [{ required: true, message: "请输入密码", trigger: "blur" }],
+  username: [
+    { required: true, message: "请输入用户名", trigger: "blur" },
+    { min: 3, max: 20, message: "用户名长度在3到20个字符之间", trigger: "blur" },
+  ],
+  password: [
+    { required: true, message: "请输入密码", trigger: "blur" },
+    { min: 6, max: 30, message: "密码长度在6到30个字符之间", trigger: "blur" },
+  ],
+  confirmPassword: [
+    { required: true, message: "请确认密码", trigger: "blur" },
+    {
+      validator: (rule, value, callback) => {
+        if (value !== form.password) {
+          callback(new Error("两次输入的密码不一致"));
+        } else {
+          callback();
+        }
+      },
+      trigger: "blur",
+    },
+  ],
 };
 
-const handleLogin = async () => {
+const handleRegister = async () => {
   if (!formRef.value) return;
 
   await formRef.value.validate((valid) => {
@@ -82,7 +113,7 @@ const handleLogin = async () => {
   loading.value = true;
 
   try {
-    const response = await fetch("http://localhost:8000/api/auth/login", {
+    const response = await fetch("http://localhost:8000/api/auth/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -96,17 +127,21 @@ const handleLogin = async () => {
     const result = await response.json();
 
     if (result.code === 200) {
+      ElMessage.success("注册成功！即将跳转至首页");
+      
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("username", result.data.username);
       localStorage.setItem("userRole", result.data.role);
-      ElMessage.success("登录成功！");
-      router.push("/");
+
+      setTimeout(() => {
+        router.push("/");
+      }, 1500);
     } else {
-      ElMessage.error(result.message || "用户名或密码错误！");
+      ElMessage.error(result.message || "注册失败");
     }
   } catch (error) {
-    ElMessage.error("登录失败，请稍后重试");
-    console.error("Login error:", error);
+    ElMessage.error("注册失败，请稍后重试");
+    console.error("Registration error:", error);
   } finally {
     loading.value = false;
   }
@@ -114,7 +149,7 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-.login-page {
+.register-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -122,7 +157,7 @@ const handleLogin = async () => {
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
 }
 
-.login-container {
+.register-container {
   width: 400px;
   background: #fff;
   border-radius: 16px;
@@ -130,7 +165,7 @@ const handleLogin = async () => {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
-.login-header {
+.register-header {
   text-align: center;
   margin-bottom: 36px;
 }
@@ -140,27 +175,27 @@ const handleLogin = async () => {
   margin-bottom: 12px;
 }
 
-.login-header h1 {
+.register-header h1 {
   font-size: 24px;
   color: #1a1a2e;
   margin-bottom: 8px;
 }
 
-.login-header p {
+.register-header p {
   font-size: 13px;
   color: #999;
 }
 
-.login-form {
+.register-form {
   margin-bottom: 24px;
 }
 
-.login-form :deep(.el-input__wrapper) {
+.register-form :deep(.el-input__wrapper) {
   padding: 12px 16px;
   border-radius: 8px;
 }
 
-.login-btn {
+.register-btn {
   width: 100%;
   height: 48px;
   font-size: 16px;
@@ -170,29 +205,23 @@ const handleLogin = async () => {
   margin-top: 8px;
 }
 
-.login-btn:hover {
+.register-btn:hover {
   background: linear-gradient(135deg, #00b894, #00a381);
 }
 
-.login-footer {
+.register-footer {
   text-align: center;
+  font-size: 13px;
+  color: #999;
 }
 
-.login-footer p {
-  font-size: 12px;
-  color: #ccc;
-}
-
-.login-footer .register-link {
-  margin-top: 8px;
-}
-
-.login-footer .register-link a {
+.register-footer .link {
   color: #00c9a7;
+  margin-left: 4px;
   text-decoration: none;
 }
 
-.login-footer .register-link a:hover {
+.register-footer .link:hover {
   text-decoration: underline;
 }
 </style>

@@ -1,12 +1,19 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Inference from "../views/Inference.vue";
 import Login from "../views/Login.vue";
+import Register from "../views/Register.vue";
 
 const routes = [
   {
     path: "/login",
     name: "login",
     component: Login,
+    meta: { requiresAuth: false },
+  },
+  {
+    path: "/register",
+    name: "register",
+    component: Register,
     meta: { requiresAuth: false },
   },
   {
