@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import Inference from "../views/Inference.vue";
 import Login from "../views/Login.vue";
 import Register from "../views/Register.vue";
+import History from "../views/History.vue";
 
 const routes = [
   {
@@ -20,6 +21,12 @@ const routes = [
     path: "/",
     name: "inference",
     component: Inference,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/history",
+    name: "history",
+    component: History,
     meta: { requiresAuth: true },
   },
 ];
