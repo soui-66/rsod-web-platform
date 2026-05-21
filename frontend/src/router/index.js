@@ -4,6 +4,7 @@ import Login from "../views/Login.vue";
 import Register from "../views/Register.vue";
 import History from "../views/History.vue";
 import Chat from "../views/Chat.vue";
+import Profile from "../views/Profile.vue";
 
 const routes = [
   {
@@ -34,6 +35,12 @@ const routes = [
     path: "/ai-chat",
     name: "chat",
     component: Chat,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/profile",
+    name: "profile",
+    component: Profile,
     meta: { requiresAuth: true },
   },
 ];
