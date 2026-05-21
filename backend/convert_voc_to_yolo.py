@@ -70,7 +70,7 @@ def process_dataset(labels_dir):
 
 
 if __name__ == "__main__":
-    base_dir = r"D:\Users\ZFF\PycharmProjects\rsod-web-platform\backend\datasets\rsod\aircraft"
+    base_dir = r"datasets\rsod\aircraft"
 
     print("转换训练集标注...")
     process_dataset(os.path.join(base_dir, "train", "labels"))

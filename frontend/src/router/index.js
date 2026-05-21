@@ -3,6 +3,7 @@ import Inference from "../views/Inference.vue";
 import Login from "../views/Login.vue";
 import Register from "../views/Register.vue";
 import History from "../views/History.vue";
+import Chat from "../views/Chat.vue";
 
 const routes = [
   {
@@ -27,6 +28,12 @@ const routes = [
     path: "/history",
     name: "history",
     component: History,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/ai-chat",
+    name: "chat",
+    component: Chat,
     meta: { requiresAuth: true },
   },
 ];

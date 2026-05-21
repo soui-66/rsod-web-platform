@@ -1,4 +1,4 @@
-path: rsod/aircraft
+path: datasets/rsod/aircraft
 
 train: train/images
 val: test/images

@@ -533,13 +533,17 @@ onMounted(() => {
 }
 
 .refresh-btn {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.3);
+  color: #667eea;
+  background: #fff;
+  border-color: #fff;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .refresh-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: #f8f9fa;
+  border-color: #e9ecef;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .stats-cards {
