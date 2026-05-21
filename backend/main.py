@@ -213,16 +213,28 @@ async def delete_history_record(record_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/history/stats")
 async def get_history_stats(db: Session = Depends(get_db)):
-    total_count = db.query(DetectionRecord).count()
-    today = datetime.now().date()
-    today_count = db.query(DetectionRecord).filter(
-        DetectionRecord.created_at >= datetime.combine(today, datetime.min.time())
-    ).count()
-    total_targets = db.query(DetectionRecord).with_entities(
-        db.func.sum(DetectionRecord.target_count)
-    ).scalar() or 0
-
-    return {"code": 200, "data": {"total_count": total_count, "today_count": today_count, "total_targets": total_targets}}
+    print("统计API被调用")
+    try:
+        records = db.query(DetectionRecord).all()
+        total_count = len(records)
+        
+        total_targets = 0
+        today_count = 0
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        
+        for record in records:
+            total_targets += record.target_count
+            if str(record.created_at).startswith(today_str):
+                today_count += 1
+        
+        result = {"code": 200, "data": {"total_count": total_count, "today_count": today_count, "total_targets": total_targets}}
+        print(f"返回结果: {result}")
+        return result
+    except Exception as e:
+        print(f"统计API错误: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"code": 500, "message": str(e)})
 
 
 # ==================== 用户认证接口 ====================
