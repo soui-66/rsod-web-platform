@@ -5,9 +5,10 @@ from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from ultralytics import YOLO
+from passlib.context import CryptContext
 import os
 import uuid
 import json
@@ -17,6 +18,8 @@ from PIL import Image, ImageDraw
 
 from database import get_db, init_db
 from models import DetectionRecord, User
+
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], default="pbkdf2_sha256", deprecated="auto")
 
 app = FastAPI(
     title="遥感目标智能检测平台",
@@ -220,6 +223,87 @@ async def get_history_stats(db: Session = Depends(get_db)):
     ).scalar() or 0
 
     return {"code": 200, "data": {"total_count": total_count, "today_count": today_count, "total_targets": total_targets}}
+
+
+# ==================== 用户认证接口 ====================
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password):
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        password = password_bytes[:72].decode('utf-8', errors='ignore')
+    return pwd_context.hash(password)
+
+
+@app.post("/api/auth/register")
+async def register_user(request: RegisterRequest, db: Session = Depends(get_db)):
+    try:
+        existing_user = db.query(User).filter(User.username == request.username).first()
+        if existing_user:
+            return JSONResponse(
+                status_code=400,
+                content={"code": 400, "message": "用户名已存在"}
+            )
+
+        hashed_password = get_password_hash(request.password)
+        new_user = User(
+            username=request.username,
+            password=hashed_password,
+            role="user"
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+
+        return {
+            "code": 200,
+            "message": "注册成功",
+            "data": {
+                "id": new_user.id,
+                "username": new_user.username,
+                "role": new_user.role
+            }
+        }
+    except Exception as e:
+        import traceback
+        print("注册错误:", str(e))
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"code": 500, "message": f"注册失败: {str(e)}"}
+        )
+
+
+@app.post("/api/auth/login")
+async def login_user(request: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == request.username).first()
+    if not user or not verify_password(request.password, user.password):
+        return JSONResponse(
+            status_code=400,
+            content={"code": 400, "message": "用户名或密码错误"}
+        )
+
+    return {
+        "code": 200,
+        "message": "登录成功",
+        "data": {
+            "id": user.id,
+            "username": user.username,
+            "role": user.role
+        }
+    }
 
 
 if __name__ == "__main__":
