@@ -3,9 +3,9 @@ __pycache__/
 *.pyc
 *.pt
 !backend/yolo11n.pt
-# 放行你需要的两个模型文件
-!backend/runs/detect/rsod_yolo11n19/weights/best.pt
-!backend/runs/detect/rsod_yolo11n19/weights/last.pt
+# 训练好的固定模型
+!backend/runs/detect/best_model.pt
+!backend/runs/detect/last_model.pt
 *.pth
 *.onnx
 .venv/
@@ -13,9 +13,11 @@ venv/
 env/
 *.db
 
-# 图片过滤（不上传 png jpg）
+# 训练数据集（不上传图片）
+backend/datasets/
 *.jpg
 *.jpeg
+*.png
 
 # 数据库存储
 storage/
