@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
+"""RSOD 数据集转换工具"""
+
 import os
-import glob
+import sys
+from pathlib import Path
 from PIL import Image
+
+# 导入路径管理模块
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from app.utils.paths import Paths
 
 
 def convert_voc_to_yolo(txt_path):
@@ -56,26 +63,35 @@ def convert_voc_to_yolo(txt_path):
 
 def process_dataset(labels_dir):
     """处理整个标注目录"""
-    txt_files = glob.glob(os.path.join(labels_dir, "*.txt"))
+    txt_files = list(Path(labels_dir).glob("*.txt"))
 
     for txt_file in txt_files:
-        yolo_content = convert_voc_to_yolo(txt_file)
+        yolo_content = convert_voc_to_yolo(str(txt_file))
 
         if yolo_content:
             with open(txt_file, 'w') as f:
                 f.write(yolo_content)
-            print(f"已转换: {os.path.basename(txt_file)}")
+            print(f"已转换: {txt_file.name}")
         else:
-            print(f"跳过(无有效标注): {os.path.basename(txt_file)}")
+            print(f"跳过(无有效标注): {txt_file.name}")
 
 
 if __name__ == "__main__":
-    base_dir = r"datasets\rsod\aircraft"
+    # ✅ 使用 Paths 统一管理路径
+    # 优点：
+    # 1. 不需要知道项目在哪个磁盘
+    # 2. 不需要手动拼接路径字符串
+    # 3. 所有路径集中在一处，修改方便
+    rsod_dir = Paths.rsod_data()
+    
+    # 确保输出目录存在
+    Paths.ensure_dir(rsod_dir / "train" / "labels")
+    Paths.ensure_dir(rsod_dir / "test" / "labels")
 
     print("转换训练集标注...")
-    process_dataset(os.path.join(base_dir, "train", "labels"))
+    process_dataset(rsod_dir / "train" / "labels")
 
     print("\n转换测试集标注...")
-    process_dataset(os.path.join(base_dir, "test", "labels"))
+    process_dataset(rsod_dir / "test" / "labels")
 
     print("\n转换完成！")

@@ -57,6 +57,116 @@ async def root():
     return {"message": "欢迎使用遥感目标智能检测平台"}
 
 
+@app.post("/api/inference/batch")
+async def inference_batch(
+    files: list[UploadFile] = File(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        start_time = datetime.now()
+        
+        results = []
+        total_target_count = 0
+        batch_detections = []
+        
+        for file in files:
+            file_content = await file.read()
+            
+            # 原图转 base64
+            original_b64 = base64.b64encode(file_content).decode("utf-8")
+            original_url = f"data:image/jpeg;base64,{original_b64}"
+            
+            # 保存临时文件用于推理
+            temp_path = os.path.join(BASE_DIR, "static", f"temp_{uuid.uuid4().hex}.jpg")
+            with open(temp_path, "wb") as f:
+                f.write(file_content)
+            
+            # YOLO 推理
+            result = model(temp_path, save=False)
+            
+            # 生成标注图
+            img = Image.open(BytesIO(file_content))
+            draw = ImageDraw.Draw(img)
+            
+            detections = []
+            for box in result[0].boxes:
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                cls = model.names[int(box.cls[0])]
+                conf = float(box.conf[0])
+                detections.append({
+                    "class": cls,
+                    "confidence": conf,
+                    "bbox": [float(v) for v in box.xyxy[0].tolist()]
+                })
+                draw.rectangle([x1, y1, x2, y2], outline="#00FF00", width=3)
+                draw.text((x1, max(y1 - 20, 0)), f"{cls} {conf:.2f}", fill="#00FF00")
+            
+            # 结果图转 base64
+            buffer = BytesIO()
+            img.save(buffer, format="JPEG")
+            result_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            result_url = f"data:image/jpeg;base64,{result_b64}"
+            
+            # 统计
+            target_count = len(detections)
+            total_target_count += target_count
+            max_confidence = max([d["confidence"] for d in detections]) if detections else 0.0
+            
+            # 收集单张图片结果
+            results.append({
+                "file_name": file.filename,
+                "detections": detections,
+                "image_url": result_url,
+                "original_url": original_url,
+                "target_count": target_count,
+                "max_confidence": max_confidence
+            })
+            
+            # 收集检测信息用于数据库
+            batch_detections.extend([{**d, "file_name": file.filename} for d in detections])
+            
+            # 删除临时文件
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        
+        # 计算总耗时
+        duration = (datetime.now() - start_time).total_seconds()
+        
+        # 存入数据库（批量记录）
+        record = DetectionRecord(
+            file_name=f"批量检测_{len(files)}张",
+            original_image="",
+            result_image="",
+            mode="batch",
+            detections=json.dumps(batch_detections, ensure_ascii=False),
+            target_count=total_target_count,
+            duration=duration,
+            max_confidence=max([r["max_confidence"] for r in results]) if results else 0.0
+        )
+        db.add(record)
+        db.commit()
+        
+        return {
+            "code": 200,
+            "message": f"批量推理成功，共处理 {len(files)} 张图片",
+            "data": {
+                "results": results,
+                "record_id": record.id,
+                "total_images": len(files),
+                "total_targets": total_target_count,
+                "duration": duration
+            }
+        }
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"code": 500, "message": f"批量推理失败: {str(e)}"}
+        )
+
+
 @app.post("/api/inference/single")
 async def inference_single(
     file: UploadFile = File(...),

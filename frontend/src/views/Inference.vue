@@ -120,7 +120,8 @@
 
         <!-- 批量检测模式 -->
         <template v-if="currentMode === 'batch'">
-          <div class="upload-area">
+          <!-- 上传区域 -->
+          <div v-if="batchFiles.length === 0" class="upload-area">
             <el-upload
               class="upload-box"
               drag
@@ -137,6 +138,116 @@
                 <p class="upload-sub">支持同时上传多张 JPG / PNG 图片</p>
               </div>
             </el-upload>
+          </div>
+
+          <!-- 已上传文件列表 -->
+          <div v-else-if="batchResults.length === 0" class="batch-preview">
+            <div class="batch-header">
+              <span class="batch-label">
+                <el-icon><PictureRounded /></el-icon> 已选择 {{ batchFiles.length }} 张图片
+              </span>
+              <div class="batch-header-actions">
+                <el-button type="primary" size="small" text @click="triggerAddMore">
+                  <el-icon><Plus /></el-icon> 添加更多
+                </el-button>
+                <el-button type="danger" size="small" text @click="clearBatchFiles">
+                  <el-icon><Delete /></el-icon> 清空
+                </el-button>
+              </div>
+            </div>
+            <div class="batch-grid">
+              <div
+                v-for="(file, index) in batchFiles"
+                :key="index"
+                class="batch-item"
+              >
+                <img :src="file.preview" :alt="file.name" />
+                <div class="batch-item-info">
+                  <span class="batch-item-name">{{ file.name }}</span>
+                  <el-button type="text" size="small" class="batch-item-remove" @click="removeBatchFile(index)">
+                    <el-icon><Close /></el-icon>
+                  </el-button>
+                </div>
+              </div>
+              <div class="batch-add-more" @click="triggerAddMore">
+                <el-icon class="add-icon"><Plus /></el-icon>
+                <span class="add-text">添加图片</span>
+              </div>
+            </div>
+            <input
+              ref="batchFileInput"
+              type="file"
+              multiple
+              accept="image/*"
+              class="hidden-file-input"
+              @change="handleBatchFileInputChange"
+            />
+            <el-button
+              type="primary"
+              size="large"
+              class="detect-btn"
+              :loading="batchLoading"
+              @click="handleBatchInference"
+            >
+              {{ batchLoading ? "批量检测中..." : "🚀 批量检测" }}
+            </el-button>
+          </div>
+
+          <!-- 批量检测结果 -->
+          <div v-else class="batch-results">
+            <div class="batch-header">
+              <span class="batch-label">
+                <el-icon><CircleCheck /></el-icon> 批量检测完成
+              </span>
+              <div class="batch-stats">
+                <span class="stat-item">图片: {{ batchTotalImages }}</span>
+                <span class="stat-item">目标: {{ batchTotalTargets }}</span>
+                <span class="stat-item">耗时: {{ batchDuration }}s</span>
+              </div>
+            </div>
+            <div class="batch-results-grid">
+              <div
+                v-for="(result, index) in batchResults"
+                :key="index"
+                class="result-card"
+              >
+                <div class="result-header">
+                  <span class="result-name">{{ result.file_name }}</span>
+                  <span class="result-count">检测到 {{ result.target_count }} 个目标</span>
+                </div>
+                <div class="result-images">
+                  <div class="result-image-item">
+                    <span class="image-label">原图</span>
+                    <img :src="result.original_url" :alt="result.file_name" />
+                  </div>
+                  <div class="result-image-item">
+                    <span class="image-label success">结果</span>
+                    <img :src="result.image_url" :alt="result.file_name" />
+                  </div>
+                </div>
+                <div v-if="result.detections && result.detections.length > 0" class="result-detections">
+                  <div
+                    v-for="(det, detIndex) in result.detections.slice(0, 5)"
+                    :key="detIndex"
+                    class="mini-detection"
+                  >
+                    <span class="mini-class">{{ det.class }}</span>
+                    <span class="mini-conf">{{ (det.confidence * 100).toFixed(0) }}%</span>
+                  </div>
+                  <div v-if="result.detections.length > 5" class="mini-more">
+                    +{{ result.detections.length - 5 }} 更多
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="action-buttons">
+              <el-button @click="resetBatchDetection" size="large">
+                <el-icon><Refresh /></el-icon> 重新检测
+              </el-button>
+              <el-button type="primary" size="large">
+                <el-icon><Download /></el-icon> 导出报告
+              </el-button>
+            </div>
           </div>
         </template>
 
@@ -269,6 +380,11 @@ import {
   Aim,
   MagicStick,
   PictureFilled,
+  PictureRounded,
+  CircleCheck,
+  Download,
+  Plus,
+  Close,
 } from "@element-plus/icons-vue";
 
 const currentMode = ref("single");
@@ -281,6 +397,15 @@ const inferenceTime = ref("0.000");
 const loading = ref(false);
 const isDetected = ref(false);
 const hasFile = computed(() => selectedFile.value !== null);
+
+// 批量检测相关状态
+const batchFiles = ref([]);
+const batchResults = ref([]);
+const batchLoading = ref(false);
+const batchTotalImages = ref(0);
+const batchTotalTargets = ref(0);
+const batchDuration = ref(0);
+const batchFileInput = ref(null);
 
 const detectionModes = [
   { key: "single", icon: "Picture", name: "单图检测", disabled: false },
@@ -320,7 +445,101 @@ const handleFileChange = (uploadFile) => {
 };
 
 const handleBatchFileChange = (uploadFile, fileList) => {
-  console.log("批量文件:", fileList);
+  // 获取当前已有的文件名集合
+  const existingNames = new Set(batchFiles.value.map(f => f.name));
+  
+  // 找出新增的文件
+  const newFiles = fileList.filter(f => !existingNames.has(f.name));
+  
+  // 为新增文件创建预览并添加到列表
+  newFiles.forEach(f => {
+    batchFiles.value.push({
+      name: f.name,
+      raw: f.raw,
+      preview: URL.createObjectURL(f.raw),
+      size: f.size
+    });
+  });
+};
+
+const triggerAddMore = () => {
+  batchFileInput.value?.click();
+};
+
+const handleBatchFileInputChange = (event) => {
+  const files = Array.from(event.target.files);
+  const existingNames = new Set(batchFiles.value.map(f => f.name));
+  
+  files.forEach(f => {
+    if (!existingNames.has(f.name)) {
+      batchFiles.value.push({
+        name: f.name,
+        raw: f,
+        preview: URL.createObjectURL(f),
+        size: f.size
+      });
+    }
+  });
+  
+  // 清空 input 以便下次选择
+  event.target.value = "";
+};
+
+const removeBatchFile = (index) => {
+  const file = batchFiles.value[index];
+  URL.revokeObjectURL(file.preview);
+  batchFiles.value.splice(index, 1);
+};
+
+const clearBatchFiles = () => {
+  batchFiles.value.forEach(f => URL.revokeObjectURL(f.preview));
+  batchFiles.value = [];
+  batchResults.value = [];
+};
+
+const handleBatchInference = async () => {
+  if (batchFiles.value.length === 0) {
+    ElMessage.warning("请先上传图片");
+    return;
+  }
+  
+  batchLoading.value = true;
+  batchResults.value = [];
+  
+  const formData = new FormData();
+  batchFiles.value.forEach(f => {
+    formData.append("files", f.raw);
+  });
+  
+  try {
+    const startTime = Date.now();
+    const res = await axios.post(
+      "http://localhost:8000/api/inference/batch",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" }, timeout: 120000 }
+    );
+    batchDuration.value = ((Date.now() - startTime) / 1000).toFixed(3);
+    
+    if (res.data.code === 200) {
+      batchResults.value = res.data.data.results || [];
+      batchTotalImages.value = res.data.data.total_images || 0;
+      batchTotalTargets.value = res.data.data.total_targets || 0;
+      ElMessage.success(`批量检测完成！共处理 ${batchTotalImages.value} 张图片，发现 ${batchTotalTargets.value} 个目标`);
+    } else {
+      ElMessage.error(res.data.message || "批量检测失败");
+    }
+  } catch (err) {
+    ElMessage.error(`请求失败: ${err.message}`);
+  } finally {
+    batchLoading.value = false;
+  }
+};
+
+const resetBatchDetection = () => {
+  clearBatchFiles();
+  batchTotalImages.value = 0;
+  batchTotalTargets.value = 0;
+  batchDuration.value = 0;
 };
 
 const clearFile = () => {
@@ -806,5 +1025,230 @@ const resetDetection = () => {
 
 .ai-advice strong {
   color: #667eea;
+}
+
+/* 批量检测样式 */
+.batch-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.batch-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.batch-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.batch-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.batch-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: #666;
+}
+
+.stat-item {
+  background: #f5f7fa;
+  padding: 4px 12px;
+  border-radius: 4px;
+}
+
+.batch-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.batch-item {
+  background: #f9fafb;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e8ecf1;
+}
+
+.batch-item img {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+}
+
+.batch-item-info {
+  padding: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.batch-item-name {
+  font-size: 12px;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.batch-item-remove {
+  color: #f56c6c;
+  padding: 0;
+  margin-left: 8px;
+}
+
+.batch-add-more {
+  background: #f5f7fa;
+  border-radius: 10px;
+  border: 2px dashed #d9d9d9;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 120px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.batch-add-more:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.add-icon {
+  font-size: 24px;
+  color: #999;
+  margin-bottom: 8px;
+}
+
+.add-text {
+  font-size: 13px;
+  color: #999;
+}
+
+.batch-add-more:hover .add-icon,
+.batch-add-more:hover .add-text {
+  color: #667eea;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.batch-results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.batch-results-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.result-card {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.result-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.result-count {
+  font-size: 13px;
+  color: #67c23a;
+  background: rgba(103, 194, 58, 0.1);
+  padding: 2px 10px;
+  border-radius: 4px;
+}
+
+.result-images {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.result-image-item {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e8ecf1;
+}
+
+.result-image-item img {
+  width: 100%;
+  height: 180px;
+  object-fit: contain;
+}
+
+.image-label {
+  display: block;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #666;
+  background: #f5f7fa;
+  border-bottom: 1px solid #e8ecf1;
+}
+
+.image-label.success {
+  color: #67c23a;
+  background: rgba(103, 194, 58, 0.1);
+}
+
+.result-detections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mini-detection {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #e8ecf1;
+}
+
+.mini-class {
+  font-size: 12px;
+  color: #333;
+}
+
+.mini-conf {
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 600;
+}
+
+.mini-more {
+  font-size: 12px;
+  color: #999;
+  padding: 4px 10px;
 }
 </style>
