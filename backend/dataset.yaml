@@ -1,5 +1,5 @@
 # 自动生成的 YOLO 数据集配置文件
-# 生成时间: 2026-05-22 15:35:05
+# 生成时间: 2026-05-22 16:42:57
 
 # 类别数量
 nc: 4
@@ -12,7 +12,7 @@ names:
   3: playground
 
 # 数据集路径（相对于此配置文件）
-path: datasets/converted
+path: converted
 
 # 训练集路径
 train:

@@ -1,8 +1,0 @@
-path: datasets/rsod/aircraft
-
-train: train/images
-val: test/images
-
-nc: 1
-names:
-  0: aircraft

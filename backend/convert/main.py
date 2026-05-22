@@ -9,26 +9,23 @@
 import sys
 from pathlib import Path
 
-# 获取 backend 目录路径
-BACKEND_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(BACKEND_DIR))
+# 添加 backend 目录到 sys.path
+backend_dir = Path(__file__).parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
-# 导入 paths 模块
 from app.utils.paths import Paths
-
-# 导入 logger 模块（直接导入，不带 app 前缀）
 from app.utils.logger import setup_converter_logging
+
 logger = setup_converter_logging()
 
-from convert.detector import FormatDetector, DataFormat, detect_all_datasets
-from convert.converter_voc import convert_voc_dataset
+from detector import FormatDetector, DataFormat, detect_all_datasets
+from converter_voc import convert_voc_dataset
 
 
 def generate_dataset_yaml(converted_results: list, output_path: Path):
-    """
-    生成YOLO数据集配置文件
-    """
-    # 收集所有类别
+    """生成YOLO数据集配置文件"""
+    # 收集所有类别（按出现顺序）
     all_classes = []
     class_set = set()
     for result in converted_results:
@@ -37,7 +34,6 @@ def generate_dataset_yaml(converted_results: list, output_path: Path):
                 all_classes.append(cls)
                 class_set.add(cls)
 
-    # 构建YAML内容
     yaml_content = f"""# 自动生成的 YOLO 数据集配置文件
 # 生成时间: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
@@ -53,7 +49,7 @@ names:
 
     yaml_content += f"""
 # 数据集路径（相对于此配置文件）
-path: datasets/converted
+path: converted
 
 # 训练集路径
 train:
@@ -69,7 +65,6 @@ train:
     for result in converted_results:
         yaml_content += f"  - {result['name']}/test/images\n"
 
-    # 写入文件
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(yaml_content)
 
@@ -83,8 +78,8 @@ def main():
     logger.info("=" * 60)
 
     # 获取路径
-    datasets_dir = Paths.datasets()  # backend/datasets
-    rsod_dir = Paths.rsod_data()  # backend/datasets/rsod
+    datasets_dir = Paths.datasets()      # backend/datasets
+    rsod_dir = Paths.rsod_data()        # backend/datasets/rsod
     converted_dir = datasets_dir / "converted"
 
     # 确保目录存在
@@ -106,7 +101,21 @@ def main():
 
     logger.info(f"共检测到 {len(datasets)} 个数据集")
 
-    # 2. 根据格式调用对应转换器
+    # 2. 创建全局类别映射（关键修复）
+    all_classes = []
+    class_set = set()
+    for ds_info in datasets:
+        for cls in ds_info.classes:
+            if cls not in class_set:
+                all_classes.append(cls)
+                class_set.add(cls)
+
+    # 创建全局类别映射（所有数据集共用）
+    global_class_map = {name: idx for idx, name in enumerate(all_classes)}
+
+    logger.info(f"全局类别映射: {global_class_map}")
+
+    # 3. 根据格式调用对应转换器
     converted_results = []
 
     for ds_info in datasets:
@@ -116,9 +125,11 @@ def main():
 
         if ds_info.format == DataFormat.VOC:
             logger.info(f"检测到VOC格式，开始转换...")
-            result = convert_voc_dataset(ds_info, converted_dir)
-            converted_results.append(result)
-            logger.info(f"{ds_info.name} 转换完成")
+            # 传入全局 class_map
+            result = convert_voc_dataset(ds_info, converted_dir, global_class_map)
+            if result:
+                converted_results.append(result)
+                logger.info(f"{ds_info.name} 转换完成")
         elif ds_info.format == DataFormat.COCO:
             logger.warning(f"COCO格式转换器尚未实现: {ds_info.name}")
         elif ds_info.format == DataFormat.YOLO:
@@ -126,7 +137,7 @@ def main():
         else:
             logger.error(f"未知格式，无法转换: {ds_info.name}")
 
-    # 3. 生成dataset.yaml
+    # 4. 生成dataset.yaml
     if converted_results:
         yaml_path = Paths.backend() / "dataset.yaml"
         generate_dataset_yaml(converted_results, yaml_path)
