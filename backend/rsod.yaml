@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 path: datasets/rsod/aircraft
+=======
+path: datasets/rsod
+>>>>>>> Stashed changes
 
 train: images/train
 val: images/val

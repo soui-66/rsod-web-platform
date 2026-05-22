@@ -18,7 +18,10 @@ backend/datasets/
 *.jpg
 *.jpeg
 *.png
+*.txt
+*.xml
 
+backend/logs/
 # 数据库存储
 storage/
 

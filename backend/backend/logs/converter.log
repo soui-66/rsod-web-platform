@@ -1,0 +1,6 @@
+2026-05-22 15:31:33,102 - root - INFO - ============================================================
+2026-05-22 15:31:33,114 - root - INFO - 数据集转换工具启动
+2026-05-22 15:31:33,116 - root - INFO - ============================================================
+2026-05-22 15:31:33,117 - root - INFO - 原始数据目录: D:\Users\ZFF\PycharmProjects\rsod-web-platform\backend\backend\datasets\rsod
+2026-05-22 15:31:33,118 - root - INFO - 转换输出目录: D:\Users\ZFF\PycharmProjects\rsod-web-platform\backend\backend\datasets\converted
+2026-05-22 15:31:33,118 - root - ERROR - RSOD数据目录不存在: D:\Users\ZFF\PycharmProjects\rsod-web-platform\backend\backend\datasets\rsod

@@ -62,7 +62,7 @@ class Paths:
     @classmethod
     def backend(cls):
         """backend 目录"""
-        return cls.root() / "backend"
+        return cls.root()  # 直接返回 root，不再加 /backend
 
     @classmethod
     def app(cls):
