@@ -402,21 +402,108 @@
 
         <!-- 视频检测模式 -->
         <template v-if="currentMode === 'video'">
-          <div class="upload-area">
-            <el-upload
-              class="upload-box"
-              drag
-              action="#"
-              :auto-upload="false"
-              :show-file-list="true"
+          <!-- 视频上传 -->
+          <div v-if="!videoFile" class="upload-area">
+            <div class="upload-box-wrapper">
+              <el-upload
+                class="upload-box"
+                drag
+                action="#"
+                :auto-upload="false"
+                :show-file-list="false"
+                :disabled="true"
+              >
+                <div class="upload-content">
+                  <el-icon class="upload-icon"><VideoCamera /></el-icon>
+                  <p class="upload-main">点击或拖拽视频到此处</p>
+                  <p class="upload-sub">支持 MP4 / AVI / MOV 格式</p>
+                </div>
+              </el-upload>
+              <div 
+                class="upload-overlay"
+                @click="triggerVideoSelect"
+              ></div>
+            </div>
+            <input
+              ref="videoFileInput"
+              type="file"
               accept="video/*"
-            >
-              <div class="upload-content">
-                <el-icon class="upload-icon"><VideoCamera /></el-icon>
-                <p class="upload-main">点击或拖拽视频到此处</p>
-                <p class="upload-sub">支持 MP4 / AVI / MOV 格式</p>
+              class="hidden-file-input"
+              @change="handleVideoFileChange"
+            />
+          </div>
+
+          <!-- 视频预览和检测 -->
+          <div v-else-if="!videoOutputUrl" class="video-preview">
+            <div class="batch-header">
+              <span class="batch-label">
+                <el-icon><VideoCamera /></el-icon> 待检测视频: {{ videoFile.name }}
+              </span>
+              <div class="batch-header-actions">
+                <el-button type="danger" size="small" text @click="resetVideoDetection">
+                  <el-icon><Delete /></el-icon> 移除
+                </el-button>
               </div>
-            </el-upload>
+            </div>
+            <div class="video-container">
+              <video :src="videoPreviewUrl" controls class="video-player"></video>
+            </div>
+            <el-button
+              type="primary"
+              size="large"
+              class="detect-btn"
+              :loading="videoLoading"
+              @click="handleVideoInference"
+            >
+              {{ videoLoading ? "视频检测中..." : "🚀 开始检测" }}
+            </el-button>
+          </div>
+
+          <!-- 视频检测结果 - 显示带有识别框的完整视频 -->
+          <div v-else class="video-results">
+            <div class="batch-header">
+              <span class="batch-label">
+                <el-icon><CircleCheck /></el-icon> 视频检测完成
+              </span>
+              <div class="batch-stats">
+                <span class="stat-item">帧数: {{ videoTotalFrames }}</span>
+                <span class="stat-item">目标: {{ videoTotalTargets }}</span>
+                <span class="stat-item">耗时: {{ videoDuration }}s</span>
+              </div>
+            </div>
+            <div class="video-container result-video">
+              <video 
+                :key="videoOutputUrl"
+                :src="videoOutputUrl" 
+                controls 
+                class="video-player result-player"
+                crossOrigin="anonymous"
+                @error="handleVideoError"
+                @loadedmetadata="handleVideoLoaded"
+              ></video>
+            </div>
+            <div class="video-info-panel">
+              <div class="info-title">检测结果摘要</div>
+              <div class="info-content">
+                <div class="info-item">
+                  <span class="info-label">处理帧数</span>
+                  <span class="info-value">{{ videoTotalFrames }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">检测目标</span>
+                  <span class="info-value">{{ videoTotalTargets }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">处理耗时</span>
+                  <span class="info-value">{{ videoDuration }}s</span>
+                </div>
+              </div>
+            </div>
+            <div class="action-buttons">
+              <el-button @click="resetVideoDetection" size="large">
+                <el-icon><Refresh /></el-icon> 重新检测
+              </el-button>
+            </div>
           </div>
         </template>
       </div>
@@ -547,6 +634,17 @@ const folderDuration = ref(0);
 const folderFileInput = ref(null);
 const folderInput = ref(null);
 
+// 视频检测相关状态
+const videoFile = ref(null);
+const videoPreviewUrl = ref("");
+const videoOutputUrl = ref("");
+const videoResults = ref([]);
+const videoLoading = ref(false);
+const videoDuration = ref(0);
+const videoTotalFrames = ref(0);
+const videoTotalTargets = ref(0);
+const videoFileInput = ref(null);
+
 const detectionModes = [
   { key: "single", icon: "Picture", name: "单图检测", disabled: false },
   { key: "batch", icon: "Upload", name: "批量检测", disabled: false },
@@ -578,6 +676,8 @@ const minConfidence = computed(() => {
 
 // 获取当前模式的检测结果
 const getCurrentDetections = computed(() => {
+  console.log("getCurrentDetections - currentMode:", currentMode.value);
+  
   if (currentMode.value === 'single') {
     return detections.value;
   } else if (currentMode.value === 'batch') {
@@ -608,6 +708,23 @@ const getCurrentDetections = computed(() => {
       }
     });
     return allDetections;
+  } else if (currentMode.value === 'video') {
+    // 视频检测：合并所有帧的检测结果
+    console.log("videoResults.length:", videoResults.value.length);
+    const allDetections = [];
+    videoResults.value.forEach(result => {
+      console.log("processing frame:", result.frame_index, "detections:", result.detections?.length);
+      if (result.detections) {
+        result.detections.forEach(det => {
+          allDetections.push({
+            ...det,
+            frameIndex: result.frame_index
+          });
+        });
+      }
+    });
+    console.log("total video detections:", allDetections.length);
+    return allDetections;
   }
   return [];
 });
@@ -635,6 +752,8 @@ const currentInferenceTime = computed(() => {
     return batchDuration.value;
   } else if (currentMode.value === 'folder') {
     return folderDuration.value;
+  } else if (currentMode.value === 'video') {
+    return videoDuration.value;
   }
   return "0.000";
 });
@@ -922,6 +1041,142 @@ const resetFolderDetection = () => {
   folderDuration.value = 0;
 };
 
+// 视频检测相关函数
+const triggerVideoSelect = () => {
+  videoFileInput.value?.click();
+};
+
+const handleVideoFileChange = (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (file) {
+    if (videoPreviewUrl.value) {
+      URL.revokeObjectURL(videoPreviewUrl.value);
+    }
+    videoFile.value = file;
+    videoPreviewUrl.value = URL.createObjectURL(file);
+    videoResults.value = [];
+    videoTotalFrames.value = 0;
+    videoTotalTargets.value = 0;
+    videoDuration.value = 0;
+  }
+};
+
+const handleVideoInference = async () => {
+  if (!videoFile.value) {
+    ElMessage.warning("请先上传视频");
+    return;
+  }
+  
+  videoLoading.value = true;
+  videoResults.value = [];
+  
+  const formData = new FormData();
+  formData.append("video", videoFile.value);
+  
+  try {
+    const startTime = Date.now();
+    const res = await axios.post(
+      "http://localhost:8000/api/inference/video",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" }, timeout: 300000 }
+    );
+    videoDuration.value = ((Date.now() - startTime) / 1000).toFixed(3);
+    
+    if (res.data.code === 200) {
+      videoOutputUrl.value = res.data.data.video_url;
+      videoTotalFrames.value = res.data.data.total_frames || 0;
+      videoTotalTargets.value = res.data.data.total_targets || 0;
+      
+      // 处理检测结果，按帧分组
+      const detectionsData = res.data.data.detections || [];
+      console.log("检测结果数量:", detectionsData.length);
+      
+      // 按帧索引分组
+      const framesMap = new Map();
+      detectionsData.forEach(det => {
+        const frameIndex = det.frame_index || 0;
+        if (!framesMap.has(frameIndex)) {
+          framesMap.set(frameIndex, []);
+        }
+        framesMap.get(frameIndex).push(det);
+      });
+      
+      // 转换为 videoResults 格式
+      videoResults.value = Array.from(framesMap.entries()).map(([frameIndex, dets]) => ({
+        frame_index: frameIndex,
+        detections: dets
+      }));
+      
+      console.log("视频检测结果分组完成，共", videoResults.value.length, "帧有检测结果");
+      
+      // 详细调试日志
+      console.log("=== 视频检测完成 ===");
+      console.log("响应数据:", res.data);
+      console.log("视频URL:", videoOutputUrl.value);
+      console.log("视频URL类型:", typeof videoOutputUrl.value);
+      console.log("视频URL长度:", videoOutputUrl.value?.length);
+      console.log("总帧数:", videoTotalFrames.value);
+      console.log("总目标数:", videoTotalTargets.value);
+      
+      // 验证URL格式
+      if (!videoOutputUrl.value) {
+        console.error("错误：视频URL为空");
+        ElMessage.error("视频URL为空");
+        return;
+      }
+      
+      if (!videoOutputUrl.value.startsWith("http")) {
+        console.error("错误：视频URL格式不正确:", videoOutputUrl.value);
+        ElMessage.error("视频URL格式不正确");
+        return;
+      }
+      
+      // 手动触发视频加载
+      setTimeout(() => {
+        const videoElement = document.querySelector('.result-video video');
+        if (videoElement) {
+          console.log("找到视频元素:", videoElement);
+          console.log("视频元素src:", videoElement.src);
+          videoElement.load();
+        } else {
+          console.error("未找到视频元素");
+        }
+      }, 100);
+      
+      ElMessage.success(`视频检测完成！共分析 ${videoTotalFrames.value} 帧，发现 ${videoTotalTargets.value} 个目标`);
+    } else {
+      ElMessage.error(res.data.message || "视频检测失败");
+    }
+  } catch (err) {
+    ElMessage.error(`请求失败：${err.message}`);
+  } finally {
+    videoLoading.value = false;
+  }
+};
+
+const resetVideoDetection = () => {
+  if (videoPreviewUrl.value) {
+    URL.revokeObjectURL(videoPreviewUrl.value);
+  }
+  videoFile.value = null;
+  videoPreviewUrl.value = "";
+  videoOutputUrl.value = "";
+  videoResults.value = [];
+  videoTotalFrames.value = 0;
+  videoTotalTargets.value = 0;
+  videoDuration.value = 0;
+};
+
+const handleVideoError = (e) => {
+  console.error("视频加载失败:", e);
+  console.error("视频URL:", videoOutputUrl.value);
+  ElMessage.error(`视频加载失败，请检查网络连接或刷新页面重试`);
+};
+
+const handleVideoLoaded = () => {
+  console.log("视频加载成功");
+};
+
 const clearFile = () => {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
   selectedFile.value = null;
@@ -1129,6 +1384,81 @@ const resetDetection = () => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.video-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.video-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  background: #f9fafb;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.video-player {
+  width: 100%;
+  max-width: 640px;
+  border-radius: 8px;
+}
+
+.video-results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.video-container.result-video {
+  border: 2px solid #10b981;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+.video-player.result-player {
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+}
+
+.video-info-panel {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.video-info-panel .info-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.video-info-panel .info-content {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.video-info-panel .info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.video-info-panel .info-label {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.video-info-panel .info-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #10b981;
 }
 
 .upload-content {
