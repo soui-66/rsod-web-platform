@@ -8,7 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import os
 
 from database import get_db, init_db
-from app.api import detection, validation, history, auth
+from app.api import detection, validation, history, auth, camera
 
 app = FastAPI(
     title="遥感目标智能检测平台",
@@ -50,6 +50,7 @@ app.include_router(detection.router)
 app.include_router(validation.router)
 app.include_router(history.router)
 app.include_router(auth.router)
+app.include_router(camera.router)
 
 
 @app.on_event("startup")

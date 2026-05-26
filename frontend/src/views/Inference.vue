@@ -122,22 +122,42 @@
         <template v-if="currentMode === 'batch'">
           <!-- 上传区域 -->
           <div v-if="batchFiles.length === 0" class="upload-area">
-            <el-upload
-              class="upload-box"
-              drag
-              action="#"
-              :auto-upload="false"
-              :on-change="handleBatchFileChange"
-              :show-file-list="true"
-              multiple
-              accept="image/*"
-            >
-              <div class="upload-content">
-                <el-icon class="upload-icon"><Upload /></el-icon>
-                <p class="upload-main">点击或拖拽多张图片到此处</p>
-                <p class="upload-sub">支持同时上传多张 JPG / PNG 图片</p>
+            <div class="batch-upload-wrapper">
+              <el-upload
+                class="upload-box"
+                drag
+                action="#"
+                :auto-upload="false"
+                :on-change="handleBatchFileChange"
+                :show-file-list="false"
+                multiple
+                accept="image/*"
+              >
+                <div class="upload-content">
+                  <el-icon class="upload-icon"><Upload /></el-icon>
+                  <p class="upload-main">点击或拖拽图片到此处</p>
+                  <p class="upload-sub">支持 JPG / PNG / WEBP 格式</p>
+                </div>
+              </el-upload>
+              <div class="upload-divider">
+                <span>或</span>
               </div>
-            </el-upload>
+              <div class="folder-select-area" @click="triggerFolderSelect">
+                <el-icon class="folder-icon"><FolderOpened /></el-icon>
+                <p class="folder-main">选择文件夹</p>
+                <p class="folder-sub">自动识别文件夹中的所有图片</p>
+              </div>
+              <input
+                ref="folderInput"
+                type="file"
+                webkitdirectory
+                mozdirectory
+                directory
+                multiple
+                class="hidden-file-input"
+                @change="handleFolderInputChange"
+              />
+            </div>
           </div>
 
           <!-- 已上传文件列表 -->
@@ -251,153 +271,9 @@
           </div>
         </template>
 
-        <!-- 文件夹模式 -->
-        <template v-if="currentMode === 'folder'">
-          <!-- 选择文件夹 -->
-          <div v-if="folderFiles.length === 0" class="upload-area">
-            <div class="upload-box-wrapper">
-              <el-upload
-                class="upload-box"
-                drag
-                action="#"
-                :auto-upload="false"
-                :show-file-list="false"
-                :disabled="true"
-              >
-                <div class="upload-content">
-                  <el-icon class="upload-icon"><FolderOpened /></el-icon>
-                  <p class="upload-main">点击或拖拽文件夹到此处</p>
-                  <p class="upload-sub">自动识别文件夹中的所有图片（JPG/PNG 格式）</p>
-                </div>
-              </el-upload>
-              <div 
-                class="upload-overlay"
-                @click="triggerFolderSelect"
-                @dragover.prevent
-                @drop.prevent="handleFolderDrop"
-              ></div>
-            </div>
-            <input
-              ref="folderInput"
-              type="file"
-              webkitdirectory
-              mozdirectory
-              directory
-              multiple
-              class="hidden-file-input"
-              @change="handleFolderInputChange"
-            />
-          </div>
-
-          <!-- 已选择文件夹预览 -->
-          <div v-else-if="folderResults.length === 0" class="folder-preview">
-            <div class="batch-header">
-              <span class="batch-label">
-                <el-icon><FolderOpened /></el-icon> 已选择 {{ folderFiles.length }} 张图片
-              </span>
-              <div class="batch-header-actions">
-                <el-button type="primary" size="small" text @click="triggerFolderAddMore">
-                  <el-icon><Plus /></el-icon> 添加更多
-                </el-button>
-                <el-button type="danger" size="small" text @click="clearFolderFiles">
-                  <el-icon><Delete /></el-icon> 清空
-                </el-button>
-              </div>
-            </div>
-            <div class="batch-grid">
-              <div
-                v-for="(file, index) in folderFiles"
-                :key="index"
-                class="batch-item"
-              >
-                <img :src="file.preview" :alt="file.name" />
-                <div class="batch-item-info">
-                  <span class="batch-item-name">{{ file.name }}</span>
-                  <el-button type="text" size="small" class="batch-item-remove" @click="removeFolderFile(index)">
-                    <el-icon><Close /></el-icon>
-                  </el-button>
-                </div>
-              </div>
-              <div class="batch-add-more" @click="triggerFolderAddMore">
-                <el-icon class="add-icon"><Plus /></el-icon>
-                <span class="add-text">添加图片</span>
-              </div>
-            </div>
-            <input
-              ref="folderFileInput"
-              type="file"
-              multiple
-              accept="image/*"
-              class="hidden-file-input"
-              @change="handleFolderFileInputChange"
-            />
-            <el-button
-              type="primary"
-              size="large"
-              class="detect-btn"
-              :loading="folderLoading"
-              @click="handleFolderInference"
-            >
-              {{ folderLoading ? "文件夹检测中..." : " 开始检测" }}
-            </el-button>
-          </div>
-
-          <!-- 文件夹检测结果 -->
-          <div v-else class="folder-results">
-            <div class="batch-header">
-              <span class="batch-label">
-                <el-icon><CircleCheck /></el-icon> 文件夹检测完成
-              </span>
-              <div class="batch-stats">
-                <span class="stat-item">图片：{{ folderTotalImages }}</span>
-                <span class="stat-item">目标：{{ folderTotalTargets }}</span>
-                <span class="stat-item">耗时：{{ folderDuration }}s</span>
-              </div>
-            </div>
-            <div class="batch-results-grid">
-              <div
-                v-for="(result, index) in folderResults"
-                :key="index"
-                class="result-card"
-              >
-                <div class="result-header">
-                  <span class="result-name">{{ result.file_name }}</span>
-                  <span class="result-count">检测到 {{ result.target_count }} 个目标</span>
-                </div>
-                <div class="result-images">
-                  <div class="result-image-item">
-                    <span class="image-label">原图</span>
-                    <img :src="result.original_url" :alt="result.file_name" />
-                  </div>
-                  <div class="result-image-item">
-                    <span class="image-label success">结果</span>
-                    <img :src="result.image_url" :alt="result.file_name" />
-                  </div>
-                </div>
-                <div v-if="result.detections && result.detections.length > 0" class="result-detections">
-                  <div
-                    v-for="(det, detIndex) in result.detections.slice(0, 5)"
-                    :key="detIndex"
-                    class="mini-detection"
-                  >
-                    <span class="mini-class">{{ det.class }}</span>
-                    <span class="mini-conf">{{ (det.confidence * 100).toFixed(0) }}%</span>
-                  </div>
-                  <div v-if="result.detections.length > 5" class="mini-more">
-                    +{{ result.detections.length - 5 }} 更多
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="action-buttons">
-              <el-button @click="resetFolderDetection" size="large">
-                <el-icon><Refresh /></el-icon> 重新检测
-              </el-button>
-              <el-button type="primary" size="large">
-                <el-icon><Download /></el-icon> 导出报告
-              </el-button>
-            </div>
-          </div>
+        <!-- 摄像头检测模式 -->
+        <template v-if="currentMode === 'camera'">
+          <CameraDetection />
         </template>
 
         <!-- 视频检测模式 -->
@@ -584,6 +460,7 @@
 import { ref, computed } from "vue";
 import axios from "axios";
 import { ElMessage } from "element-plus";
+import CameraDetection from "../components/CameraDetection.vue";
 import {
   Upload,
   Picture,
@@ -601,6 +478,7 @@ import {
   Download,
   Plus,
   Close,
+  Camera,
 } from "@element-plus/icons-vue";
 
 const currentMode = ref("single");
@@ -622,16 +500,6 @@ const batchTotalImages = ref(0);
 const batchTotalTargets = ref(0);
 const batchDuration = ref(0);
 const batchFileInput = ref(null);
-
-// 文件夹检测相关状态
-const folderFiles = ref([]);
-const folderResults = ref([]);
-const folderLoading = ref(false);
-const folderName = ref("");
-const folderTotalImages = ref(0);
-const folderTotalTargets = ref(0);
-const folderDuration = ref(0);
-const folderFileInput = ref(null);
 const folderInput = ref(null);
 
 // 视频检测相关状态
@@ -647,8 +515,8 @@ const videoFileInput = ref(null);
 
 const detectionModes = [
   { key: "single", icon: "Picture", name: "单图检测", disabled: false },
-  { key: "batch", icon: "Upload", name: "批量检测", disabled: false },
-  { key: "folder", icon: "FolderOpened", name: "文件夹", disabled: false },
+  { key: "batch", icon: "FolderOpened", name: "批量检测", disabled: false },
+  { key: "camera", icon: "Camera", name: "摄像头检测", disabled: false },
   { key: "video", icon: "VideoCamera", name: "视频检测", disabled: false },
 ];
 
@@ -681,23 +549,8 @@ const getCurrentDetections = computed(() => {
   if (currentMode.value === 'single') {
     return detections.value;
   } else if (currentMode.value === 'batch') {
-    // 批量检测：合并所有图片的检测结果
     const allDetections = [];
     batchResults.value.forEach(result => {
-      if (result.detections) {
-        result.detections.forEach(det => {
-          allDetections.push({
-            ...det,
-            fileName: result.file_name
-          });
-        });
-      }
-    });
-    return allDetections;
-  } else if (currentMode.value === 'folder') {
-    // 文件夹检测：合并所有图片的检测结果
-    const allDetections = [];
-    folderResults.value.forEach(result => {
       if (result.detections) {
         result.detections.forEach(det => {
           allDetections.push({
@@ -750,8 +603,6 @@ const currentInferenceTime = computed(() => {
     return inferenceTime.value;
   } else if (currentMode.value === 'batch') {
     return batchDuration.value;
-  } else if (currentMode.value === 'folder') {
-    return folderDuration.value;
   } else if (currentMode.value === 'video') {
     return videoDuration.value;
   }
@@ -869,83 +720,15 @@ const triggerFolderSelect = () => {
   folderInput.value?.click();
 };
 
-const handleFolderChange = (uploadFile, fileList) => {
-  if (fileList.length > 0) {
-    // 清空之前的文件
-    folderFiles.value.forEach(f => URL.revokeObjectURL(f.preview));
-    folderFiles.value = [];
-    
-    // 获取文件夹名称（从第一个文件的 webkitRelativePath 提取）
-    const firstFile = fileList[0];
-    if (firstFile.raw?.webkitRelativePath) {
-      const pathParts = firstFile.raw.webkitRelativePath.split('/');
-      folderName.value = pathParts[0] || '未命名文件夹';
-    } else {
-      folderName.value = '未命名文件夹';
-    }
-    
-    // 添加所有文件
-    fileList.forEach(file => {
-      if (file.raw?.type?.startsWith('image/')) {
-        folderFiles.value.push({
-          name: file.name,
-          raw: file.raw,
-          preview: URL.createObjectURL(file.raw),
-          size: file.size
-        });
-      }
-    });
-    
-    ElMessage.success(`已选择文件夹，共 ${folderFiles.value.length} 张图片`);
-  }
-};
-
-const handleFolderDrop = (e) => {
-  const files = Array.from(e.dataTransfer.files);
-  if (files.length > 0) {
-    // 清空之前的文件
-    folderFiles.value.forEach(f => URL.revokeObjectURL(f.preview));
-    folderFiles.value = [];
-    
-    folderName.value = '拖拽的文件夹';
-    
-    // 添加所有图片文件
-    files.forEach(file => {
-      if (file.type?.startsWith('image/')) {
-        folderFiles.value.push({
-          name: file.name,
-          raw: file,
-          preview: URL.createObjectURL(file),
-          size: file.size
-        });
-      }
-    });
-    
-    ElMessage.success(`已选择，共 ${folderFiles.value.length} 张图片`);
-  }
-};
-
 const handleFolderInputChange = (event) => {
   const files = Array.from(event.target.files);
   
   if (files.length > 0) {
-    // 清空之前的文件
-    folderFiles.value.forEach(f => URL.revokeObjectURL(f.preview));
-    folderFiles.value = [];
+    const existingNames = new Set(batchFiles.value.map(f => f.name));
     
-    // 获取文件夹名称（从第一个文件的 webkitRelativePath 提取）
-    const firstFile = files[0];
-    if (firstFile.webkitRelativePath) {
-      const pathParts = firstFile.webkitRelativePath.split('/');
-      folderName.value = pathParts[0] || '未命名文件夹';
-    } else {
-      folderName.value = '未命名文件夹';
-    }
-    
-    // 添加所有图片文件
     files.forEach(file => {
-      if (file.type.startsWith('image/')) {
-        folderFiles.value.push({
+      if (file.type.startsWith('image/') && !existingNames.has(file.name)) {
+        batchFiles.value.push({
           name: file.name,
           raw: file,
           preview: URL.createObjectURL(file),
@@ -954,91 +737,10 @@ const handleFolderInputChange = (event) => {
       }
     });
     
-    ElMessage.success(`已选择文件夹，共 ${folderFiles.value.length} 张图片`);
+    ElMessage.success(`已添加 ${files.filter(f => f.type.startsWith('image/')).length} 张图片`);
     
-    // 清空 input 以便下次选择
     event.target.value = "";
   }
-};
-
-const triggerFolderAddMore = () => {
-  folderFileInput.value?.click();
-};
-
-const handleFolderFileInputChange = (event) => {
-  const files = Array.from(event.target.files);
-  const existingNames = new Set(folderFiles.value.map(f => f.name));
-  
-  files.forEach(f => {
-    if (!existingNames.has(f.name)) {
-      folderFiles.value.push({
-        name: f.name,
-        raw: f,
-        preview: URL.createObjectURL(f),
-        size: f.size
-      });
-    }
-  });
-  
-  event.target.value = "";
-};
-
-const removeFolderFile = (index) => {
-  const file = folderFiles.value[index];
-  URL.revokeObjectURL(file.preview);
-  folderFiles.value.splice(index, 1);
-};
-
-const clearFolderFiles = () => {
-  folderFiles.value.forEach(f => URL.revokeObjectURL(f.preview));
-  folderFiles.value = [];
-  folderResults.value = [];
-  folderName.value = "";
-};
-
-const handleFolderInference = async () => {
-  if (folderFiles.value.length === 0) {
-    ElMessage.warning("请先选择文件夹或添加图片");
-    return;
-  }
-  
-  folderLoading.value = true;
-  folderResults.value = [];
-  
-  const formData = new FormData();
-  folderFiles.value.forEach(f => {
-    formData.append("files", f.raw);
-  });
-  
-  try {
-    const startTime = Date.now();
-    const res = await axios.post(
-      "http://localhost:8000/api/inference/batch",
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" }, timeout: 120000 }
-    );
-    folderDuration.value = ((Date.now() - startTime) / 1000).toFixed(3);
-    
-    if (res.data.code === 200) {
-      folderResults.value = res.data.data.results || [];
-      folderTotalImages.value = res.data.data.total_images || 0;
-      folderTotalTargets.value = res.data.data.total_targets || 0;
-      ElMessage.success(`文件夹检测完成！共处理 ${folderTotalImages.value} 张图片，发现 ${folderTotalTargets.value} 个目标`);
-    } else {
-      ElMessage.error(res.data.message || "文件夹检测失败");
-    }
-  } catch (err) {
-    ElMessage.error(`请求失败：${err.message}`);
-  } finally {
-    folderLoading.value = false;
-  }
-};
-
-const resetFolderDetection = () => {
-  clearFolderFiles();
-  folderTotalImages.value = 0;
-  folderTotalTargets.value = 0;
-  folderDuration.value = 0;
 };
 
 // 视频检测相关函数
@@ -1347,6 +1049,65 @@ const resetDetection = () => {
   position: relative;
   width: 100%;
   height: 100%;
+}
+
+.batch-upload-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+}
+
+.upload-divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #999;
+  font-size: 13px;
+}
+
+.upload-divider::before,
+.upload-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e8ecf1;
+}
+
+.folder-select-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  border: 2px dashed #d0d5dd;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.folder-select-area:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.folder-icon {
+  font-size: 48px;
+  color: #667eea;
+  margin-bottom: 16px;
+}
+
+.folder-main {
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.folder-sub {
+  font-size: 13px;
+  color: #999;
 }
 
 .upload-box {
