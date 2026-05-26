@@ -346,6 +346,13 @@ const stopCameraDetection = async () => {
     videoRef.value.srcObject = null;
   }
   
+  // 清空检测框和Canvas
+  currentBoxes.value = [];
+  if (canvasRef.value) {
+    const ctx = canvasRef.value.getContext('2d');
+    ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
+  }
+  
   currentBoxes.value = [];
   frameIndex.value = 0;
   fps.value = 0;
