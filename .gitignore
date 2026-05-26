@@ -1,41 +1,74 @@
 # Python
 __pycache__/
-*.pyc
-*.pt
-!backend/yolo11n.pt
-# 训练好的固定模型
-!backend/runs/detect/best_model.pt
-!backend/runs/detect/last_model.pt
-*.pth
-*.onnx
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
 .venv/
 venv/
+ENV/
 env/
+
+# 数据库文件
 *.db
+*.sqlite
+*.sqlite3
+backend/rsod_platform.db
 
-# 训练数据集（不上传图片）
-backend/datasets/
-*.jpg
-*.jpeg
-*.png
-*.txt
-*.xml
-
-backend/logs/
-# 数据库存储
-storage/
-
-# 静态文件
-backend/static/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Node.js
 node_modules/
 dist/
+.nuxt/
+.cache/
 
-# 系统文件
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+backend/static/*
+backend/uploads/*
+backend/results/*
+!backend/static/.gitkeep
+!backend/uploads/.gitkeep
+!backend/results/.gitkeep
+
+# 环境变量
+.env.local
+.env.*.local
+
+# 操作系统
 .DS_Store
 Thumbs.db
 
-# IDE
-.idea/
-.vscode/
+# YOLO模型文件（太大，不提交）
+*.pt
+*.pth
+*.onnx
+!backend/yolo11n.pt
