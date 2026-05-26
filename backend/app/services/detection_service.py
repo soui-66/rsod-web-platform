@@ -16,7 +16,7 @@ class DetectionService:
         self.base_dir = base_dir
         self.static_dir = os.path.join(base_dir, "static")
 
-    def detect_single_image(self, file_content: bytes) -> dict:
+    def detect_single_image(self, file_content: bytes, confidence_threshold: float = 0.25) -> dict:
         """单图检测"""
         start_time = datetime.now()
 
@@ -29,8 +29,8 @@ class DetectionService:
         with open(temp_path, "wb") as f:
             f.write(file_content)
 
-        # YOLO 推理
-        results = self.model(temp_path, save=False)
+        # YOLO 推理，设置置信度阈值
+        results = self.model(temp_path, save=False, conf=confidence_threshold)
 
         # 生成标注图
         img = Image.open(BytesIO(file_content))
@@ -41,13 +41,15 @@ class DetectionService:
             x1, y1, x2, y2 = box.xyxy[0].tolist()
             cls = self.model.names[int(box.cls[0])]
             conf = float(box.conf[0])
-            detections.append({
-                "class": cls,
-                "confidence": conf,
-                "bbox": [float(v) for v in box.xyxy[0].tolist()]
-            })
-            draw.rectangle([x1, y1, x2, y2], outline="#00FF00", width=3)
-            draw.text((x1, max(y1 - 20, 0)), f"{cls} {conf:.2f}", fill="#00FF00")
+            # 过滤低于阈值的检测结果
+            if conf >= confidence_threshold:
+                detections.append({
+                    "class": cls,
+                    "confidence": conf,
+                    "bbox": [float(v) for v in box.xyxy[0].tolist()]
+                })
+                draw.rectangle([x1, y1, x2, y2], outline="#00FF00", width=3)
+                draw.text((x1, max(y1 - 20, 0)), f"{cls} {conf:.2f}", fill="#00FF00")
 
         # 结果图转 base64
         buffer = BytesIO()
@@ -83,7 +85,7 @@ class DetectionService:
             results.append(result)
         return results
 
-    def detect_video(self, video_content: bytes, video_filename: str) -> dict:
+    def detect_video(self, video_content: bytes, video_filename: str, confidence_threshold: float = 0.25) -> dict:
         """视频检测"""
         import cv2
 
@@ -148,24 +150,26 @@ class DetectionService:
             with open(temp_frame_path, "wb") as f:
                 f.write(frame_content)
 
-            # YOLO 推理
+            # YOLO 推理，设置置信度阈值
             try:
-                yolo_result = self.model(temp_frame_path, save=False)
+                yolo_result = self.model(temp_frame_path, save=False, conf=confidence_threshold)
 
                 frame_detections = []
                 for box in yolo_result[0].boxes:
                     x1, y1, x2, y2 = box.xyxy[0].tolist()
                     cls = self.model.names[int(box.cls[0])]
                     conf = float(box.conf[0])
-                    frame_detections.append({
-                        "class": cls,
-                        "confidence": conf,
-                        "bbox": [float(v) for v in box.xyxy[0].tolist()]
-                    })
-                    cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 3)
-                    label = f"{cls} {conf:.2f}"
-                    cv2.putText(frame, label, (int(x1), max(int(y1) - 10, 10)),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    # 过滤低于阈值的检测结果
+                    if conf >= confidence_threshold:
+                        frame_detections.append({
+                            "class": cls,
+                            "confidence": conf,
+                            "bbox": [float(v) for v in box.xyxy[0].tolist()]
+                        })
+                        cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 3)
+                        label = f"{cls} {conf:.2f}"
+                        cv2.putText(frame, label, (int(x1), max(int(y1) - 10, 10)),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
                 target_count = len(frame_detections)
                 total_targets += target_count

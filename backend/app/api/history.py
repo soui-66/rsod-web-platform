@@ -33,7 +33,7 @@ async def get_history_list(
 
     result = []
     for r in records:
-        result.append({
+        record_data = {
             "id": r.id,
             "file_name": r.file_name,
             "file_path": r.original_image,
@@ -45,7 +45,11 @@ async def get_history_list(
             "duration": r.duration,
             "max_confidence": r.max_confidence,
             "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S")
-        })
+        }
+        # 如果是批量检测，添加批量数据
+        if r.batch_data:
+            record_data["batch_data"] = json.loads(r.batch_data)
+        result.append(record_data)
 
     return {"code": 200, "data": {"total": total, "records": result}}
 
@@ -65,20 +69,24 @@ async def get_history_detail(record_id: int, db: Session = Depends(get_db)):
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
 
+    record_data = {
+        "id": record.id,
+        "file_name": record.file_name,
+        "file_path": record.original_image,
+        "result_path": record.result_image,
+        "mode": record.mode,
+        "detections": json.loads(record.detections) if record.detections else [],
+        "target_count": record.target_count,
+        "duration": record.duration,
+        "max_confidence": record.max_confidence,
+        "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    # 如果是批量检测，添加批量数据
+    if record.batch_data:
+        record_data["batch_data"] = json.loads(record.batch_data)
     return {
         "code": 200,
-        "data": {
-            "id": record.id,
-            "file_name": record.file_name,
-            "file_path": record.original_image,
-            "result_path": record.result_image,
-            "mode": record.mode,
-            "detections": json.loads(record.detections) if record.detections else [],
-            "target_count": record.target_count,
-            "duration": record.duration,
-            "max_confidence": record.max_confidence,
-            "created_at": record.created_at.strftime("%Y-%m-%d %H:%M:%S")
-        }
+        "data": record_data
     }
 
 

@@ -26,6 +26,27 @@
       </div>
     </div>
 
+    <!-- 置信度阈值设置 -->
+    <div class="threshold-section">
+      <div class="threshold-label">
+        <el-icon><Aim /></el-icon> 置信度阈值
+      </div>
+      <div class="threshold-slider">
+        <el-slider 
+          v-model="confidenceThreshold" 
+          :min="0.1" 
+          :max="0.9" 
+          :step="0.05"
+          :show-stops="true"
+          :show-input="true"
+        />
+      </div>
+      <div class="threshold-info">
+        当前阈值: <span class="threshold-value">{{ (confidenceThreshold * 100).toFixed(0) }}%</span>
+        <span class="threshold-hint">低于此阈值的检测结果将被过滤</span>
+      </div>
+    </div>
+
     <!-- 主内容区 -->
     <div class="main-content">
       <!-- 左侧：上传/检测区 -->
@@ -492,6 +513,9 @@ const loading = ref(false);
 const isDetected = ref(false);
 const hasFile = computed(() => selectedFile.value !== null);
 
+// 置信度阈值
+const confidenceThreshold = ref(0.25);
+
 // 批量检测相关状态
 const batchFiles = ref([]);
 const batchResults = ref([]);
@@ -702,6 +726,7 @@ const handleBatchInference = async () => {
   batchFiles.value.forEach(f => {
     formData.append("files", f.raw);
   });
+  formData.append("confidence_threshold", confidenceThreshold.value);
   
   try {
     const startTime = Date.now();
@@ -793,6 +818,7 @@ const handleVideoInference = async () => {
   
   const formData = new FormData();
   formData.append("video", videoFile.value);
+  formData.append("confidence_threshold", confidenceThreshold.value);
   
   try {
     const startTime = Date.now();
@@ -915,6 +941,7 @@ const handleInference = async () => {
   loading.value = true;
   const formData = new FormData();
   formData.append("file", selectedFile.value);
+  formData.append("confidence_threshold", confidenceThreshold.value);
 
   try {
     const startTime = Date.now();
@@ -975,7 +1002,7 @@ const resetDetection = () => {
 
 /* 模式选择区 */
 .mode-section {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .mode-label {
@@ -1012,8 +1039,49 @@ const resetDetection = () => {
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.3s;
+}
+
+/* 置信度阈值设置区 */
+.threshold-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.threshold-label {
   font-size: 14px;
-  color: #555;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.threshold-slider {
+  max-width: 400px;
+  margin-bottom: 8px;
+}
+
+.threshold-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #666;
+}
+
+.threshold-value {
+  font-weight: 600;
+  color: #667eea;
+  font-size: 15px;
+}
+
+.threshold-hint {
+  color: #999;
+  font-size: 12px;
 }
 
 .mode-card:hover {

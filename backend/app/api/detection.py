@@ -1,5 +1,5 @@
 # 检测接口
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -28,12 +28,15 @@ def get_detection_service():
 @router.post("/single")
 async def inference_single(
     file: UploadFile = File(...),
+    confidence_threshold: float = Form(0.25),
     db: Session = Depends(get_db)
 ):
     """
     单图目标检测接口
 
     上传一张图片，返回检测结果和标注后的图片
+    
+    :param confidence_threshold: 置信度阈值，范围0-1，低于此阈值的检测结果将被过滤
     """
     try:
         # 读取图片
@@ -41,7 +44,7 @@ async def inference_single(
 
         # 检测服务
         service = get_detection_service()
-        result = service.detect_single_image(file_content)
+        result = service.detect_single_image(file_content, confidence_threshold=confidence_threshold)
 
         # 存入数据库
         record = DetectionRecord(
@@ -82,12 +85,15 @@ async def inference_single(
 @router.post("/batch")
 async def inference_batch(
     files: list[UploadFile] = File(...),
+    confidence_threshold: float = Form(0.25),
     db: Session = Depends(get_db)
 ):
     """
     批量目标检测接口
 
     上传多张图片，返回所有图片的检测结果
+    
+    :param confidence_threshold: 置信度阈值，范围0-1，低于此阈值的检测结果将被过滤
     """
     try:
         start_time = datetime.now()
@@ -99,7 +105,7 @@ async def inference_batch(
 
         for file in files:
             file_content = await file.read()
-            result = service.detect_single_image(file_content)
+            result = service.detect_single_image(file_content, confidence_threshold=confidence_threshold)
 
             results.append({
                 "file_name": file.filename,
@@ -118,13 +124,14 @@ async def inference_batch(
         # 存入数据库
         record = DetectionRecord(
             file_name=f"批量检测_{len(files)}张",
-            original_image="",
-            result_image="",
+            original_image=results[0]["original_url"] if results else "",
+            result_image=results[0]["image_url"] if results else "",
             mode="batch",
             detections=json.dumps(batch_detections, ensure_ascii=False),
             target_count=total_target_count,
             duration=duration,
-            max_confidence=max([r["max_confidence"] for r in results]) if results else 0.0
+            max_confidence=max([r["max_confidence"] for r in results]) if results else 0.0,
+            batch_data=json.dumps(results, ensure_ascii=False)
         )
         db.add(record)
         db.commit()
@@ -153,12 +160,15 @@ async def inference_batch(
 @router.post("/video")
 async def inference_video(
     video: UploadFile = File(...),
+    confidence_threshold: float = Form(0.25),
     db: Session = Depends(get_db)
 ):
     """
     视频目标检测接口
 
     对视频的每一帧进行目标检测，输出带有识别框的完整视频
+    
+    :param confidence_threshold: 置信度阈值，范围0-1，低于此阈值的检测结果将被过滤
     """
     try:
         service = get_detection_service()
@@ -168,7 +178,7 @@ async def inference_video(
         video_filename = video.filename or "video_detection"
 
         # 执行视频检测
-        result = service.detect_video(video_content, video_filename)
+        result = service.detect_video(video_content, video_filename, confidence_threshold=confidence_threshold)
 
         # 存入数据库
         record = DetectionRecord(

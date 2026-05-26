@@ -142,6 +142,10 @@
               <div class="image-overlay">
                 <el-icon class="zoom-icon"><ZoomIn /></el-icon>
               </div>
+              <!-- 批量检测显示 +n -->
+              <div v-if="record.mode === 'batch' && record.batch_data" class="batch-count-badge">
+                +{{ record.batch_data.length }}
+              </div>
             </div>
           </div>
 
@@ -215,7 +219,37 @@
       :close-on-click-modal="false"
     >
       <div v-if="selectedRecord" class="detail-content">
-        <div class="detail-images">
+        <!-- 批量检测显示所有图片 -->
+        <div v-if="selectedRecord.mode === 'batch' && selectedRecord.batch_data" class="batch-images-container">
+          <h4 class="section-title">📁 批量检测图片 ({{ selectedRecord.batch_data.length }}张)</h4>
+          <div class="batch-images-grid">
+            <div 
+              v-for="(item, index) in selectedRecord.batch_data" 
+              :key="index"
+              class="batch-image-item"
+            >
+              <div class="batch-image-label">{{ index + 1 }}. {{ item.file_name }}</div>
+              <div class="batch-image-pair">
+                <div class="image-box-small">
+                  <span class="box-label-small">原图</span>
+                  <img :src="item.original_url" alt="原图" @click="previewImage(item.original_url)" />
+                </div>
+                <div class="image-arrow-small">→</div>
+                <div class="image-box-small">
+                  <span class="box-label-small success">结果</span>
+                  <img :src="item.image_url" alt="结果图" @click="previewImage(item.image_url)" />
+                </div>
+              </div>
+              <div class="batch-image-stats">
+                <span>目标数: {{ item.target_count }}</span>
+                <span>最高置信度: {{ (item.max_confidence * 100).toFixed(1) }}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 单图检测显示一对图片 -->
+        <div v-else class="detail-images">
           <div class="image-box">
             <span class="box-label">原始图片</span>
             <img :src="selectedRecord.file_path" alt="原图" class="detail-img" />
@@ -419,9 +453,19 @@ const refreshData = () => {
  currentPage.value = 1;
  fetchHistoryList();
 };
-const viewDetail = (record) => {
- selectedRecord.value = record;
- detailVisible.value = true;
+const viewDetail = async (record) => {
+  try {
+    const res = await axios.get(`http://localhost:8000/api/history/detail/${record.id}`);
+    if (res.data.code === 200) {
+      selectedRecord.value = res.data.data;
+      detailVisible.value = true;
+    } else {
+      ElMessage.error(res.data.message || "获取详情失败");
+    }
+  } catch (err) {
+    console.error("获取详情失败:", err);
+    ElMessage.error("获取详情失败");
+  }
 };
 const deleteRecord = async (id) => {
  try {
@@ -946,5 +990,120 @@ onMounted(() => {
 
 .list-move {
   transition: transform 0.3s ease;
+}
+
+/* 批量检测 +n 徽章 */
+.batch-count-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+  z-index: 10;
+}
+
+/* 批量检测详情容器 */
+.batch-images-container {
+  margin-bottom: 24px;
+}
+
+.batch-images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.batch-image-item {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid #e8ecf1;
+  transition: all 0.3s ease;
+}
+
+.batch-image-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.batch-image-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-image-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.image-box-small {
+  flex: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e8ecf1;
+  position: relative;
+}
+
+.image-box-small img {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.image-box-small img:hover {
+  transform: scale(1.05);
+}
+
+.box-label-small {
+  display: block;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: #f0f2f5;
+  color: #666;
+  text-align: center;
+  font-weight: 500;
+}
+
+.box-label-small.success {
+  background: rgba(103, 194, 58, 0.1);
+  color: #67c23a;
+}
+
+.image-arrow-small {
+  font-size: 18px;
+  color: #999;
+  font-weight: bold;
+}
+
+.batch-image-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #666;
+  padding-top: 8px;
+  border-top: 1px solid #e8ecf1;
+}
+
+.batch-image-stats span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 </style>

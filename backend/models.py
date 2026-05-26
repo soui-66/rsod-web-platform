@@ -25,3 +25,4 @@ class DetectionRecord(Base):
     duration = Column(Float, default=0.0)
     max_confidence = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.now)
+    batch_data = Column(Text, nullable=True)  # 批量检测的所有图片信息
