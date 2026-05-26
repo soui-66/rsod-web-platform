@@ -1,15 +1,23 @@
+"""
+数据库配置
+"""
 from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'rsod_history.db')}"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./rsod_platform.db"
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False}
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
 
 
 def get_db():
+    """获取数据库会话"""
     db = SessionLocal()
     try:
         yield db
@@ -18,5 +26,6 @@ def get_db():
 
 
 def init_db():
-    from models import Base
+    """初始化数据库"""
+    from models import DetectionRecord, User
     Base.metadata.create_all(bind=engine)
