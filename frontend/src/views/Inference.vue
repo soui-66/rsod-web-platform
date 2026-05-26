@@ -273,7 +273,7 @@
 
         <!-- 摄像头检测模式 -->
         <template v-if="currentMode === 'camera'">
-          <CameraDetection />
+          <CameraDetection @detection-update="handleCameraDetectionUpdate" />
         </template>
 
         <!-- 视频检测模式 -->
@@ -513,6 +513,13 @@ const videoTotalFrames = ref(0);
 const videoTotalTargets = ref(0);
 const videoFileInput = ref(null);
 
+// 摄像头检测相关状态
+const cameraDetections = ref([]);
+const cameraFrameIndex = ref(0);
+const cameraFps = ref(0);
+const cameraDetectionTime = ref(0);
+const cameraTotalObjects = ref(0);
+
 const detectionModes = [
   { key: "single", icon: "Picture", name: "单图检测", disabled: false },
   { key: "batch", icon: "FolderOpened", name: "批量检测", disabled: false },
@@ -541,6 +548,15 @@ const minConfidence = computed(() => {
   if (detections.value.length === 0) return "0";
   return Math.min(...detections.value.map((d) => d.confidence * 100)).toFixed(1);
 });
+
+// 处理摄像头检测更新
+const handleCameraDetectionUpdate = (data) => {
+  cameraDetections.value = data.detections || [];
+  cameraFrameIndex.value = data.frameIndex || 0;
+  cameraFps.value = data.fps || 0;
+  cameraDetectionTime.value = data.detectionTime || 0;
+  cameraTotalObjects.value = data.totalObjects || 0;
+};
 
 // 获取当前模式的检测结果
 const getCurrentDetections = computed(() => {
@@ -578,6 +594,9 @@ const getCurrentDetections = computed(() => {
     });
     console.log("total video detections:", allDetections.length);
     return allDetections;
+  } else if (currentMode.value === 'camera') {
+    // 摄像头检测：返回当前帧的检测结果
+    return cameraDetections.value;
   }
   return [];
 });

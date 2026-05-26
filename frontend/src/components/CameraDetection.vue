@@ -42,7 +42,8 @@
             size="large" 
             @click="togglePause"
           >
-            <el-icon>{{ isPaused ? '<VideoPlay />' : '<VideoPause />' }}</el-icon> 
+            <el-icon v-if="isPaused"><VideoPlay /></el-icon>
+            <el-icon v-else><VideoPause /></el-icon>
             {{ isPaused ? '恢复' : '暂停' }}
           </el-button>
           <el-button 
@@ -110,6 +111,9 @@ import { VideoCamera, VideoPlay, VideoPause, CircleClose } from '@element-plus/i
 import { ElMessage } from 'element-plus';
 import { detectFrame, startCameraDetection as apiStart, stopCameraDetection as apiStop } from '../api/detection';
 
+// 定义 emit 事件
+const emit = defineEmits(['detection-update']);
+
 // 视频和画布引用
 const videoRef = ref(null);
 const canvasRef = ref(null);
@@ -127,6 +131,16 @@ const frameIndex = ref(0);
 const fps = ref(0);
 const detectionTime = ref(0);
 const totalObjects = ref(0);
+
+// 转换检测框格式为统一格式
+const formatDetections = (boxes) => {
+  return boxes.map(box => ({
+    class: box.class_name || box.class,
+    confidence: box.confidence,
+    bbox: [box.x1, box.y1, box.x2, box.y2],
+    chinese_name: box.chinese_name
+  }));
+};
 
 // 设置参数
 const settings = ref({
@@ -243,6 +257,16 @@ const sendFrameForDetection = async () => {
         totalObjects.value = response.data.total_objects || 0;
         lastDetectionTime = currentTime;
         drawBoxes();
+        
+        // 发送检测结果更新事件给父组件
+        const formattedDetections = formatDetections(currentBoxes.value);
+        emit('detection-update', {
+          detections: formattedDetections,
+          frameIndex: frameIndex.value,
+          fps: fps.value,
+          detectionTime: detectionTime.value,
+          totalObjects: totalObjects.value
+        });
       } else {
         handleDetectionError(response.message);
       }
