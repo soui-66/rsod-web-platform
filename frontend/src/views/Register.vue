@@ -106,9 +106,14 @@ const rules = {
 const handleRegister = async () => {
   if (!formRef.value) return;
 
-  await formRef.value.validate((valid) => {
-    if (!valid) return;
-  });
+  // 修复：使用 Promise 模式进行表单校验
+  try {
+    await formRef.value.validate();
+  } catch (error) {
+    // 校验失败，直接返回，不继续执行注册逻辑
+    ElMessage.warning("请检查表单填写是否正确");
+    return;
+  }
 
   loading.value = true;
 

@@ -21,15 +21,18 @@ async def chat_completion(request: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="DeepSeek API Key 未配置")
 
     messages = request.get("messages", [])
+    user_id = request.get("user_id", 1)  # 获取用户ID，默认1
 
     # 保存用户消息到数据库
     for msg in messages:
         existing = db.query(ChatRecord).filter(
+            ChatRecord.user_id == user_id,
             ChatRecord.role == msg["role"],
             ChatRecord.content == msg["content"]
         ).first()
         if not existing:
             db.add(ChatRecord(
+                user_id=user_id,
                 role=msg["role"],
                 content=msg["content"]
             ))
@@ -74,6 +77,7 @@ async def chat_completion(request: dict, db: Session = Depends(get_db)):
 
         # 保存 AI 回答到数据库
         db.add(ChatRecord(
+            user_id=user_id,
             role="assistant",
             content=answer
         ))
@@ -98,8 +102,11 @@ async def chat_completion(request: dict, db: Session = Depends(get_db)):
 
 
 @router.get("/history")
-async def get_chat_history(db: Session = Depends(get_db)):
-    records = db.query(ChatRecord).order_by(ChatRecord.created_at.asc()).all()
+async def get_chat_history(user_id: int = 1, db: Session = Depends(get_db)):
+    records = db.query(ChatRecord)\
+        .filter(ChatRecord.user_id == user_id)\
+        .order_by(ChatRecord.created_at.asc())\
+        .all()
 
     history = []
     for r in records:
@@ -112,8 +119,8 @@ async def get_chat_history(db: Session = Depends(get_db)):
 
 
 @router.delete("/history")
-async def clear_chat_history(db: Session = Depends(get_db)):
-    db.query(ChatRecord).delete()
+async def clear_chat_history(user_id: int = 1, db: Session = Depends(get_db)):
+    db.query(ChatRecord).filter(ChatRecord.user_id == user_id).delete()
     db.commit()
     return {"code": 200, "message": "清空成功"}
 

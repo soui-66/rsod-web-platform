@@ -46,7 +46,7 @@
               <span>{{ msg.type === 'ai' ? 'AI 助手' : '您' }}</span>
               <span class="message-time">{{ msg.time }}</span>
             </div>
-            <div class="message-text" v-html="formatMessage(msg.content)"></div>
+            <div class="message-text">{{ msg.content }}</div>
           </div>
         </div>
 
@@ -98,12 +98,9 @@
 import { ref, nextTick, onMounted, onUnmounted } from 'vue';
 import { Message, Delete, Aim, User, ArrowRight } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
-import { chatCompletion } from '../api/detection';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8000/api';
-
-console.log('Chat.vue loaded successfully');
 
 const quickQuestions = [
   '什么是遥感目标检测？',
@@ -117,19 +114,24 @@ const inputMessage = ref('');
 const loading = ref(false);
 const chatContainer = ref(null);
 
-const formatMessage = (content) => {
-  if (!content) return '';
-  return content
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\n/g, '<br>')
-    .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>');
+const getCurrentUserId = () => {
+  const userInfo = localStorage.getItem('userInfo');
+  if (userInfo) {
+    try {
+      return JSON.parse(userInfo).id || 1;
+    } catch {
+      return 1;
+    }
+  }
+  return 1;
 };
 
 const loadHistory = async () => {
   try {
-    const response = await axios.get(`${API_URL}/chat/history`);
+    const userId = getCurrentUserId();
+    const response = await axios.get(`${API_URL}/chat/history`, {
+      params: { user_id: userId }
+    });
     if (response.data.code === 200) {
       const history = response.data.data;
       messages.value = history.map((msg, index) => ({
@@ -145,7 +147,10 @@ const loadHistory = async () => {
 
 const clearHistory = async () => {
   try {
-    await axios.delete(`${API_URL}/chat/history`);
+    const userId = getCurrentUserId();
+    await axios.delete(`${API_URL}/chat/history`, {
+      params: { user_id: userId }
+    });
     messages.value = [];
     ElMessage.success('历史记录已清空');
   } catch (err) {
@@ -164,15 +169,11 @@ const sendQuickMessage = (text) => {
 };
 
 const sendMessage = async () => {
-  console.log('sendMessage called');
-
   const text = inputMessage.value.trim();
   if (!text || loading.value) {
-    console.log('Empty text or loading, returning');
     return;
   }
 
-  console.log('Adding user message:', text);
   messages.value.push({
     type: 'user',
     content: text,
@@ -187,52 +188,35 @@ const sendMessage = async () => {
   loading.value = true;
 
   try {
+    const userId = getCurrentUserId();
     const apiMessages = messages.value.map(msg => ({
       role: msg.type === 'user' ? 'user' : 'assistant',
       content: msg.content
     }));
 
-    console.log('Sending to API:', JSON.stringify(apiMessages, null, 2));
-
-    const response = await chatCompletion(apiMessages);
-
-    console.log('API Response:', response);
+    const response = await axios.post(`${API_URL}/chat/completion`, {
+      messages: apiMessages,
+      user_id: userId
+    });
 
     if (response && response.data) {
       const res = response.data;
 
       if (res.code === 200 && res.data && res.data.content) {
-        console.log('Adding AI response:', res.data.content);
         messages.value.push({
           type: 'ai',
           content: res.data.content,
           time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
         });
       } else {
-        console.error('Invalid response format:', res);
         ElMessage.error(res.message || 'AI 回复失败');
       }
     } else {
-      console.error('Empty response:', response);
       ElMessage.error('API 响应为空');
     }
   } catch (err) {
     console.error('Chat error:', err);
     ElMessage.error('网络错误，请稍后重试');
-
-    const replies = [
-      '遥感目标检测是利用计算机视觉技术从遥感影像中自动识别和定位感兴趣目标的过程。',
-      '我们的系统支持检测多种目标类型，包括：飞机、油罐、操场、建筑物、船舶、农业虫害等。',
-      '提高检测准确率的方法包括：使用更高分辨率的影像、增加训练数据量等。'
-    ];
-
-    const randomReply = replies[Math.floor(Math.random() * replies.length)];
-
-    messages.value.push({
-      type: 'ai',
-      content: randomReply,
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-    });
   } finally {
     loading.value = false;
     nextTick(() => {
@@ -248,7 +232,6 @@ const scrollToBottom = () => {
 };
 
 onMounted(() => {
-  console.log('Chat component mounted');
   loadHistory();
   nextTick(() => {
     scrollToBottom();
@@ -256,7 +239,6 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  console.log('Chat component unmounted');
 });
 </script>
 
@@ -370,8 +352,6 @@ onUnmounted(() => {
   border-color: #3b82f6;
   background: #eff6ff;
   color: #1d4ed8;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
 .messages-list {
@@ -383,18 +363,6 @@ onUnmounted(() => {
 .message-item {
   display: flex;
   gap: 12px;
-  animation: messageSlide 0.3s ease;
-}
-
-@keyframes messageSlide {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .message-item.user {
@@ -471,27 +439,6 @@ onUnmounted(() => {
   border-bottom-right-radius: 4px;
 }
 
-.message-text strong {
-  font-weight: 600;
-}
-
-.message-text em {
-  font-style: italic;
-}
-
-.message-text pre {
-  background: #f3f4f6;
-  padding: 12px;
-  border-radius: 6px;
-  margin: 10px 0;
-  overflow-x: auto;
-}
-
-.message-text code {
-  font-family: 'Courier New', monospace;
-  font-size: 14px;
-}
-
 .typing-indicator {
   display: flex;
   gap: 4px;
@@ -548,7 +495,6 @@ onUnmounted(() => {
 
 .chat-input :deep(.el-textarea__inner:focus) {
   border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .input-actions {
