@@ -9,12 +9,31 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 from ultralytics import YOLO
 
+# 延迟导入 MinIO 服务，避免启动时依赖问题
+_minio_service = None
+
+def get_minio_service():
+    global _minio_service
+    if _minio_service is None:
+        try:
+            from app.services.minio_service import minio_service
+            _minio_service = minio_service
+        except Exception as e:
+            print(f"[检测服务] 无法初始化 MinIO 服务: {e}")
+    return _minio_service
+
 
 class DetectionService:
     def __init__(self, model_path: str, base_dir: str):
         self.model = YOLO(model_path)
         self.base_dir = base_dir
         self.static_dir = os.path.join(base_dir, "static")
+        print("[检测服务] 初始化 MinIO 服务...")
+        self.minio_service = get_minio_service()
+        if self.minio_service:
+            print(f"[检测服务] MinIO 服务获取成功，可用状态: {self.minio_service.is_available()}")
+        else:
+            print("[检测服务] MinIO 服务获取失败")
 
     def detect_single_image(self, file_content: bytes, confidence_threshold: float = 0.25) -> dict:
         """单图检测"""
@@ -66,9 +85,40 @@ class DetectionService:
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+        # 上传到 MinIO
+        minio_original_url = None
+        minio_result_url = None
+        if self.minio_service:
+            print("[检测服务] MinIO 服务实例存在")
+            if self.minio_service.is_available():
+                print("[检测服务] MinIO 服务可用，开始上传...")
+                try:
+                    # 生成唯一文件名
+                    file_id = uuid.uuid4().hex
+                    original_filename = f"detection/{file_id}_original.jpg"
+                    result_filename = f"detection/{file_id}_result.jpg"
+                    print(f"[检测服务] 准备上传文件: {original_filename}, {result_filename}")
+                    
+                    # 上传原图
+                    minio_original_url = self.minio_service.upload_image(original_filename, file_content)
+                    print(f"[检测服务] 原图上传成功: {minio_original_url}")
+                    
+                    # 上传结果图
+                    result_data = buffer.getvalue()
+                    minio_result_url = self.minio_service.upload_image(result_filename, result_data)
+                    print(f"[检测服务] 结果图上传成功: {minio_result_url}")
+                except Exception as e:
+                    print(f"[检测服务] 上传到 MinIO 失败: {e}")
+            else:
+                print("[检测服务] MinIO 服务不可用")
+        else:
+            print("[检测服务] MinIO 服务实例不存在")
+
         return {
             "original_url": original_url,
             "result_url": result_url,
+            "minio_original_url": minio_original_url,
+            "minio_result_url": minio_result_url,
             "detections": detections,
             "target_count": target_count,
             "max_confidence": max_confidence,

@@ -949,10 +949,12 @@ const getCurrentUserId = () => {
 };
 
 const handleInference = async () => {
+  console.log("handleInference called");
   if (!selectedFile.value) {
     ElMessage.warning("请先上传图片");
     return;
   }
+  console.log("selectedFile:", selectedFile.value.name);
   loading.value = true;
   const formData = new FormData();
   formData.append("file", selectedFile.value);
@@ -961,15 +963,18 @@ const handleInference = async () => {
   const userId = getCurrentUserId();
   if (userId) {
     formData.append("user_id", userId);
+    console.log("user_id:", userId);
   }
 
   try {
+    console.log("Sending request to /api/inference/single...");
     const startTime = Date.now();
     const res = await axios.post(
       "http://localhost:8000/api/inference/single",
       formData,
       { headers: { "Content-Type": "multipart/form-data" }, timeout: 60000 }
     );
+    console.log("Response received:", res.data);
     inferenceTime.value = ((Date.now() - startTime) / 1000).toFixed(3);
 
     if (res.data.code === 200) {

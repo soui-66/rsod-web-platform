@@ -57,6 +57,13 @@ app.include_router(chat_router)
 async def startup_event():
     init_db()
     print("✅ 数据库初始化完成")
+    
+    # 初始化 MinIO 服务
+    try:
+        from app.services.minio_service import minio_service
+        print(f"✅ MinIO 服务初始化完成，可用状态: {minio_service.is_available()}")
+    except Exception as e:
+        print(f"❌ MinIO 服务初始化失败: {e}")
 
 
 @app.get("/health", tags=["健康检查"])
@@ -67,6 +74,32 @@ async def health_check():
 @app.get("/", tags=["根路径"])
 async def root():
     return {"message": "欢迎使用遥感目标智能检测平台"}
+
+
+@app.get("/test-minio", tags=["测试"])
+async def test_minio():
+    """测试 MinIO 上传功能"""
+    try:
+        from app.services.minio_service import minio_service
+        
+        # 测试上传
+        test_data = b"test image data"
+        url = minio_service.upload_image("test/test.jpg", test_data)
+        
+        # 列出所有文件
+        files = minio_service.list_images()
+        
+        return {
+            "status": "success",
+            "message": "MinIO 上传测试成功",
+            "uploaded_url": url,
+            "files_in_bucket": files
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"MinIO 测试失败: {str(e)}"
+        }
 
 
 if __name__ == "__main__":

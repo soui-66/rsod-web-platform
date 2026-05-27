@@ -19,10 +19,17 @@ BASE_DIR = os.path.dirname(BASE_DIR)
 BASE_DIR = os.path.dirname(BASE_DIR)
 
 
+# 单例检测服务
+_detection_service = None
+
 def get_detection_service():
-    """获取检测服务实例"""
-    model_path = os.path.join(BASE_DIR, "runs", "detect", "best_model.pt")
-    return DetectionService(model_path, BASE_DIR)
+    """获取检测服务实例（单例）"""
+    global _detection_service
+    if _detection_service is None:
+        model_path = os.path.join(BASE_DIR, "runs", "detect", "best_model.pt")
+        _detection_service = DetectionService(model_path, BASE_DIR)
+        print("[检测接口] 检测服务初始化完成")
+    return _detection_service
 
 
 @router.post("/single")
@@ -40,13 +47,21 @@ async def inference_single(
     :param confidence_threshold: 置信度阈值，范围0-1，低于此阈值的检测结果将被过滤
     :param user_id: 用户ID，用于关联检测记录
     """
+    print(f"\n[检测接口] 收到单图检测请求")
+    print(f"[检测接口] 文件名: {file.filename}")
+    print(f"[检测接口] 用户ID: {user_id}")
+    print(f"[检测接口] 置信度阈值: {confidence_threshold}")
+    
     try:
         # 读取图片
         file_content = await file.read()
+        print(f"[检测接口] 文件大小: {len(file_content)} bytes")
 
         # 检测服务
         service = get_detection_service()
+        print(f"[检测接口] 检测服务获取成功")
         result = service.detect_single_image(file_content, confidence_threshold=confidence_threshold)
+        print(f"[检测接口] 检测完成，目标数量: {result['target_count']}")
 
         # 存入数据库
         record = DetectionRecord(
