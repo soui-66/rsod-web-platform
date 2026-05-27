@@ -482,6 +482,7 @@ import { ref, computed } from "vue";
 import axios from "axios";
 import { ElMessage } from "element-plus";
 import CameraDetection from "../components/CameraDetection.vue";
+import { getUserId } from "../utils/user.js";
 import {
   Upload,
   Picture,
@@ -728,6 +729,11 @@ const handleBatchInference = async () => {
   });
   formData.append("confidence_threshold", confidenceThreshold.value);
   
+  const userId = getCurrentUserId();
+  if (userId) {
+    formData.append("user_id", userId);
+  }
+  
   try {
     const startTime = Date.now();
     const res = await axios.post(
@@ -819,6 +825,11 @@ const handleVideoInference = async () => {
   const formData = new FormData();
   formData.append("video", videoFile.value);
   formData.append("confidence_threshold", confidenceThreshold.value);
+  
+  const userId = getCurrentUserId();
+  if (userId) {
+    formData.append("user_id", userId);
+  }
   
   try {
     const startTime = Date.now();
@@ -933,6 +944,10 @@ const clearFile = () => {
   isDetected.value = false;
 };
 
+const getCurrentUserId = () => {
+  return getUserId();
+};
+
 const handleInference = async () => {
   if (!selectedFile.value) {
     ElMessage.warning("请先上传图片");
@@ -942,6 +957,11 @@ const handleInference = async () => {
   const formData = new FormData();
   formData.append("file", selectedFile.value);
   formData.append("confidence_threshold", confidenceThreshold.value);
+  
+  const userId = getCurrentUserId();
+  if (userId) {
+    formData.append("user_id", userId);
+  }
 
   try {
     const startTime = Date.now();

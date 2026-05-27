@@ -329,6 +329,7 @@
 <script setup>import { ref, computed, onMounted } from "vue";
 import axios from "axios";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { getUserId } from "../utils/user.js";
 import { Search, Delete, Aim, Timer, TrendCharts, View, Refresh, Download, ZoomIn } from "@element-plus/icons-vue";
 const records = ref([]);
 const stats = ref({ total_count: 0, today_count: 0, total_targets: 0 });
@@ -415,11 +416,16 @@ const previewImage = (url) => {
  previewImageUrl.value = url;
  previewVisible.value = true;
 };
+const getCurrentUserId = () => {
+ return getUserId();
+};
+
 const fetchHistoryList = async () => {
  loading.value = true;
  try {
+ const userId = getCurrentUserId();
  const res = await axios.get("http://localhost:8000/api/history/list", {
- params: { page: 1, page_size: 100 }
+ params: { page: 1, page_size: 100, user_id: userId }
  });
  if (res.data.code === 200) {
  records.value = res.data.data.records;
@@ -455,7 +461,10 @@ const refreshData = () => {
 };
 const viewDetail = async (record) => {
   try {
-    const res = await axios.get(`http://localhost:8000/api/history/detail/${record.id}`);
+    const userId = getCurrentUserId();
+    const res = await axios.get(`http://localhost:8000/api/history/detail/${record.id}`, {
+      params: { user_id: userId }
+    });
     if (res.data.code === 200) {
       selectedRecord.value = res.data.data;
       detailVisible.value = true;
@@ -474,7 +483,10 @@ const deleteRecord = async (id) => {
  cancelButtonText: "取消",
  type: "warning",
  });
- const res = await axios.delete(`http://localhost:8000/api/history/${id}`);
+ const userId = getCurrentUserId();
+ const res = await axios.delete(`http://localhost:8000/api/history/${id}`, {
+ params: { user_id: userId }
+ });
  if (res.data.code === 200) {
  ElMessage.success("删除成功");
  fetchHistoryList();

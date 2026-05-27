@@ -15,6 +15,7 @@ class User(Base):
 class DetectionRecord(Base):
     __tablename__ = "detection_records"
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=True)  # 关联用户ID
     file_name = Column(String(255), nullable=False)
     original_image = Column(Text, nullable=False)
     result_image = Column(Text, nullable=True)

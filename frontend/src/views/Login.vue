@@ -99,6 +99,7 @@ const handleLogin = async () => {
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("username", result.data.username);
       localStorage.setItem("userRole", result.data.role);
+      localStorage.setItem("userInfo", JSON.stringify(result.data));
       ElMessage.success("登录成功！");
       router.push("/");
     } else {

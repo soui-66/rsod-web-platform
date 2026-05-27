@@ -41,21 +41,21 @@ def init_db():
         tables = inspector.get_table_names()
         
         if "detection_records" in tables:
-            print("✅ detection_records 表已创建")
+            print("[OK] detection_records 表已创建")
             # 检查 batch_data 字段是否存在
             columns = [col['name'] for col in inspector.get_columns('detection_records')]
             if 'batch_data' in columns:
-                print("✅ batch_data 字段已存在")
+                print("[OK] batch_data 字段已存在")
             else:
-                print("⚠️  batch_data 字段不存在，需要运行迁移脚本")
+                print("[WARN] batch_data 字段不存在，需要运行迁移脚本")
         else:
-            print("❌ detection_records 表未创建")
+            print("[ERROR] detection_records 表未创建")
             
         if "users" in tables:
-            print("✅ users 表已创建")
+            print("[OK] users 表已创建")
         else:
-            print("❌ users 表未创建")
+            print("[ERROR] users 表未创建")
             
     except Exception as e:
-        print(f"❌ 数据库初始化失败: {str(e)}")
+        print("[ERROR] 数据库初始化失败: %s" % str(e))
         raise

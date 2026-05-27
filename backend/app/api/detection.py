@@ -29,6 +29,7 @@ def get_detection_service():
 async def inference_single(
     file: UploadFile = File(...),
     confidence_threshold: float = Form(0.25),
+    user_id: int = Form(None),
     db: Session = Depends(get_db)
 ):
     """
@@ -37,6 +38,7 @@ async def inference_single(
     上传一张图片，返回检测结果和标注后的图片
     
     :param confidence_threshold: 置信度阈值，范围0-1，低于此阈值的检测结果将被过滤
+    :param user_id: 用户ID，用于关联检测记录
     """
     try:
         # 读取图片
@@ -48,6 +50,7 @@ async def inference_single(
 
         # 存入数据库
         record = DetectionRecord(
+            user_id=user_id,
             file_name=file.filename,
             original_image=result["original_url"],
             result_image=result["result_url"],
@@ -86,6 +89,7 @@ async def inference_single(
 async def inference_batch(
     files: list[UploadFile] = File(...),
     confidence_threshold: float = Form(0.25),
+    user_id: int = Form(None),
     db: Session = Depends(get_db)
 ):
     """
@@ -94,6 +98,7 @@ async def inference_batch(
     上传多张图片，返回所有图片的检测结果
     
     :param confidence_threshold: 置信度阈值，范围0-1，低于此阈值的检测结果将被过滤
+    :param user_id: 用户ID，用于关联检测记录
     """
     try:
         start_time = datetime.now()
@@ -123,6 +128,7 @@ async def inference_batch(
 
         # 存入数据库
         record = DetectionRecord(
+            user_id=user_id,
             file_name=f"批量检测_{len(files)}张",
             original_image=results[0]["original_url"] if results else "",
             result_image=results[0]["image_url"] if results else "",
@@ -161,6 +167,7 @@ async def inference_batch(
 async def inference_video(
     video: UploadFile = File(...),
     confidence_threshold: float = Form(0.25),
+    user_id: int = Form(None),
     db: Session = Depends(get_db)
 ):
     """
@@ -169,6 +176,7 @@ async def inference_video(
     对视频的每一帧进行目标检测，输出带有识别框的完整视频
     
     :param confidence_threshold: 置信度阈值，范围0-1，低于此阈值的检测结果将被过滤
+    :param user_id: 用户ID，用于关联检测记录
     """
     try:
         service = get_detection_service()
@@ -182,6 +190,7 @@ async def inference_video(
 
         # 存入数据库
         record = DetectionRecord(
+            user_id=user_id,
             file_name=video_filename,
             original_image="",
             result_image=result["video_url"],

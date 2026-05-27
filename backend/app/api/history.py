@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api/history", tags=["历史记录"])
 async def get_history_list(
     page: int = 1,
     page_size: int = 10,
+    user_id: int = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -23,44 +24,62 @@ async def get_history_list(
     参数：
         page: 页码（从1开始）
         page_size: 每页数量
+        user_id: 用户ID，用于筛选当前用户的记录
 
     返回：
         分页的历史记录列表
     """
-    query = db.query(DetectionRecord).order_by(DetectionRecord.created_at.desc())
-    total = query.count()
-    records = query.offset((page - 1) * page_size).limit(page_size).all()
+    try:
+        print(f"获取历史记录列表 - page: {page}, page_size: {page_size}, user_id: {user_id}")
+        
+        query = db.query(DetectionRecord)
+        
+        # 如果提供了有效的user_id，只返回该用户的记录
+        if user_id is not None and user_id > 0:
+            print(f"筛选用户ID: {user_id}")
+            query = query.filter(DetectionRecord.user_id == user_id)
+        
+        query = query.order_by(DetectionRecord.created_at.desc())
+        total = query.count()
+        records = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    result = []
-    for r in records:
-        record_data = {
-            "id": r.id,
-            "file_name": r.file_name,
-            "file_path": r.original_image,
-            "result_path": r.result_image,
-            "mode": r.mode,
-            "model_name": r.model_name,
-            "detections": json.loads(r.detections) if r.detections else [],
-            "target_count": r.target_count,
-            "duration": r.duration,
-            "max_confidence": r.max_confidence,
-            "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S")
-        }
-        # 如果是批量检测，添加批量数据
-        if r.batch_data:
-            record_data["batch_data"] = json.loads(r.batch_data)
-        result.append(record_data)
+        result = []
+        for r in records:
+            record_data = {
+                "id": r.id,
+                "file_name": r.file_name,
+                "file_path": r.original_image,
+                "result_path": r.result_image,
+                "mode": r.mode,
+                "model_name": r.model_name,
+                "detections": json.loads(r.detections) if r.detections else [],
+                "target_count": r.target_count,
+                "duration": r.duration,
+                "max_confidence": r.max_confidence,
+                "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else ""
+            }
+            # 如果是批量检测，添加批量数据
+            if r.batch_data:
+                record_data["batch_data"] = json.loads(r.batch_data)
+            result.append(record_data)
 
-    return {"code": 200, "data": {"total": total, "records": result}}
+        print(f"返回记录数: {len(result)}")
+        return {"code": 200, "data": {"total": total, "records": result}}
+    except Exception as e:
+        print(f"获取历史记录列表错误: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"code": 500, "message": str(e)}
 
 
 @router.get("/detail/{record_id}")
-async def get_history_detail(record_id: int, db: Session = Depends(get_db)):
+async def get_history_detail(record_id: int, user_id: int = None, db: Session = Depends(get_db)):
     """
     获取历史记录详情
 
     参数：
         record_id: 记录ID
+        user_id: 用户ID，用于验证记录归属
 
     返回：
         记录详细信息
@@ -68,6 +87,10 @@ async def get_history_detail(record_id: int, db: Session = Depends(get_db)):
     record = db.query(DetectionRecord).filter(DetectionRecord.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    
+    # 如果提供了有效的user_id，验证记录是否属于该用户
+    if user_id is not None and user_id > 0 and record.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问此记录")
 
     record_data = {
         "id": record.id,
@@ -91,12 +114,13 @@ async def get_history_detail(record_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{record_id}")
-async def delete_history_record(record_id: int, db: Session = Depends(get_db)):
+async def delete_history_record(record_id: int, user_id: int = None, db: Session = Depends(get_db)):
     """
     删除历史记录
 
     参数：
         record_id: 记录ID
+        user_id: 用户ID，用于验证记录归属
 
     返回：
         删除结果
@@ -104,22 +128,36 @@ async def delete_history_record(record_id: int, db: Session = Depends(get_db)):
     record = db.query(DetectionRecord).filter(DetectionRecord.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    
+    # 如果提供了有效的user_id，验证记录是否属于该用户
+    if user_id is not None and user_id > 0 and record.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权删除此记录")
+    
     db.delete(record)
     db.commit()
     return {"code": 200, "message": "删除成功"}
 
 
 @router.get("/stats")
-async def get_history_stats(db: Session = Depends(get_db)):
+async def get_history_stats(user_id: int = None, db: Session = Depends(get_db)):
     """
     获取历史记录统计信息
+
+    参数：
+        user_id: 用户ID，用于筛选当前用户的记录
 
     返回：
         统计数据，包括总数、今日数量、总检测目标数
     """
     print("统计API被调用")
     try:
-        records = db.query(DetectionRecord).all()
+        query = db.query(DetectionRecord)
+        
+        # 如果提供了有效的user_id，只统计该用户的记录
+        if user_id is not None and user_id > 0:
+            query = query.filter(DetectionRecord.user_id == user_id)
+        
+        records = query.all()
         total_count = len(records)
 
         total_targets = 0
