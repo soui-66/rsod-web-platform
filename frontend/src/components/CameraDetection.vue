@@ -111,28 +111,23 @@ import { VideoCamera, VideoPlay, VideoPause, CircleClose } from '@element-plus/i
 import { ElMessage } from 'element-plus';
 import { detectFrame, startCameraDetection as apiStart, stopCameraDetection as apiStop } from '../api/detection';
 
-// 定义 emit 事件
 const emit = defineEmits(['detection-update']);
 
-// 视频和画布引用
 const videoRef = ref(null);
 const canvasRef = ref(null);
 const captureCanvasRef = ref(null);
 
-// 状态变量
 const isRunning = ref(false);
 const isPaused = ref(false);
 const isStarting = ref(false);
 const videoStream = ref(null);
 
-// 检测结果
 const currentBoxes = ref([]);
 const frameIndex = ref(0);
 const fps = ref(0);
 const detectionTime = ref(0);
 const totalObjects = ref(0);
 
-// 转换检测框格式为统一格式
 const formatDetections = (boxes) => {
   return boxes.map(box => ({
     class: box.class_name || box.class,
@@ -142,17 +137,14 @@ const formatDetections = (boxes) => {
   }));
 };
 
-// 设置参数
 const settings = ref({
   confidenceThreshold: 0.5,
   inferenceInterval: 2
 });
 
-// 循环ID
 let detectionFrameId = null;
 let lastDetectionTime = 0;
 
-// 状态图标和文字
 const statusIconClass = computed(() => {
   if (isStarting.value) return 'starting';
   return 'stopped';
@@ -163,25 +155,24 @@ const statusText = computed(() => {
   return '点击开始按钮启动摄像头检测';
 });
 
-// 获取摄像头权限并启动检测
 const startCameraDetection = async () => {
   isStarting.value = true;
-  
+
   try {
-    // 启动后端检测服务
     const startResponse = await apiStart({
       camera_id: 0,
       confidence_threshold: settings.value.confidenceThreshold,
       inference_interval: settings.value.inferenceInterval
     });
-    
-    if (!startResponse.success) {
-      ElMessage.error(startResponse.message || '启动检测服务失败');
+
+    const res = startResponse.data;
+
+    if (!res.success) {
+      ElMessage.error(res.message || '启动检测服务失败');
       isStarting.value = false;
       return;
     }
-    
-    // 请求摄像头权限
+
     videoStream.value = await navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 640 },
@@ -190,8 +181,7 @@ const startCameraDetection = async () => {
       },
       audio: false,
     });
-    
-    // 绑定视频流
+
     if (videoRef.value) {
       videoRef.value.srcObject = videoStream.value;
       videoRef.value.onloadedmetadata = () => {
@@ -207,58 +197,56 @@ const startCameraDetection = async () => {
   }
 };
 
-// 初始化画布
 const initCanvas = () => {
   if (!videoRef.value || !canvasRef.value || !captureCanvasRef.value) return;
-  
+
   const video = videoRef.value;
   const canvas = canvasRef.value;
   const captureCanvas = captureCanvasRef.value;
-  
+
   canvas.width = video.videoWidth || 640;
   canvas.height = video.videoHeight || 480;
   captureCanvas.width = video.videoWidth || 640;
   captureCanvas.height = video.videoHeight || 480;
 };
 
-// 启动检测流
 const startDetectionStream = () => {
   lastDetectionTime = performance.now();
   sendFrameForDetection();
 };
 
-// 发送帧进行检测
 const sendFrameForDetection = async () => {
   if (!isRunning.value) return;
-  
+
   const currentTime = performance.now();
   const timeSinceLastDetection = currentTime - lastDetectionTime;
   const targetInterval = (settings.value.inferenceInterval * 1000) / 30;
-  
+
   if (!videoRef.value || !captureCanvasRef.value) {
     detectionFrameId = requestAnimationFrame(sendFrameForDetection);
     return;
   }
-  
+
   if (!isPaused.value && timeSinceLastDetection >= targetInterval) {
     try {
       const captureCanvas = captureCanvasRef.value;
       const ctx = captureCanvas.getContext('2d');
       ctx.drawImage(videoRef.value, 0, 0, captureCanvas.width, captureCanvas.height);
-      
+
       const imageData = captureCanvas.toDataURL('image/jpeg', 0.7);
       const response = await detectFrame({ image: imageData });
-      
-      if (response.success) {
-        currentBoxes.value = response.data.boxes || [];
-        frameIndex.value = response.data.frame_index || frameIndex.value;
-        fps.value = response.data.fps || fps.value;
-        detectionTime.value = response.data.detection_time || 0;
-        totalObjects.value = response.data.total_objects || 0;
+
+      const res = response.data;
+
+      if (res.success) {
+        currentBoxes.value = res.data.boxes || [];
+        frameIndex.value = res.data.frame_index || frameIndex.value;
+        fps.value = res.data.fps || fps.value;
+        detectionTime.value = res.data.detection_time || 0;
+        totalObjects.value = res.data.total_objects || 0;
         lastDetectionTime = currentTime;
         drawBoxes();
-        
-        // 发送检测结果更新事件给父组件
+
         const formattedDetections = formatDetections(currentBoxes.value);
         emit('detection-update', {
           detections: formattedDetections,
@@ -268,30 +256,29 @@ const sendFrameForDetection = async () => {
           totalObjects: totalObjects.value
         });
       } else {
-        handleDetectionError(response.message);
+        handleDetectionError(res.message);
       }
     } catch (error) {
       handleDetectionError(error.message || '网络请求失败');
     }
   }
-  
+
   drawBoxes();
   detectionFrameId = requestAnimationFrame(sendFrameForDetection);
 };
 
-// 绘制检测框
 const drawBoxes = () => {
   if (!canvasRef.value || !videoRef.value) return;
-  
+
   const canvas = canvasRef.value;
   const ctx = canvas.getContext('2d');
   const video = videoRef.value;
-  
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
+
   const scaleX = canvas.width / video.videoWidth;
   const scaleY = canvas.height / video.videoHeight;
-  
+
   currentBoxes.value.forEach((box) => {
     const x1 = box.x1 * scaleX;
     const y1 = box.y1 * scaleY;
@@ -299,22 +286,22 @@ const drawBoxes = () => {
     const y2 = box.y2 * scaleY;
     const width = x2 - x1;
     const height = y2 - y1;
-    
+
     ctx.strokeStyle = getBoxColor(box.class_name);
     ctx.lineWidth = 2;
     ctx.strokeRect(x1, y1, width, height);
-    
+
     ctx.fillStyle = getBoxColor(box.class_name);
     ctx.globalAlpha = 0.1;
     ctx.fillRect(x1, y1, width, height);
     ctx.globalAlpha = 1;
-    
+
     const label = `${box.chinese_name || box.class_name} ${(box.confidence * 100).toFixed(0)}%`;
     ctx.font = '12px Arial';
     ctx.fillStyle = getBoxColor(box.class_name);
     const labelWidth = ctx.measureText(label).width + 8;
     const labelHeight = 16;
-    
+
     if (y1 >= labelHeight) {
       ctx.fillRect(x1, y1 - labelHeight, labelWidth, labelHeight);
       ctx.fillStyle = '#ffffff';
@@ -327,7 +314,6 @@ const drawBoxes = () => {
   });
 };
 
-// 获取检测框颜色
 const getBoxColor = (className) => {
   const colorMap = {
     'aircraft': '#ef4444',
@@ -340,62 +326,56 @@ const getBoxColor = (className) => {
   return colorMap[className] || '#667eea';
 };
 
-// 切换暂停状态
 const togglePause = () => {
   isPaused.value = !isPaused.value;
 };
 
-// 停止检测
 const stopCameraDetection = async () => {
   try {
     await apiStop();
   } catch (error) {
     console.error('停止检测失败:', error);
   }
-  
+
   isRunning.value = false;
   isPaused.value = false;
-  
+
   if (detectionFrameId) {
     cancelAnimationFrame(detectionFrameId);
     detectionFrameId = null;
   }
-  
+
   if (videoStream.value) {
     videoStream.value.getTracks().forEach(track => track.stop());
     videoStream.value = null;
   }
-  
+
   if (videoRef.value) {
     videoRef.value.srcObject = null;
   }
-  
-  // 清空检测框和Canvas
+
   currentBoxes.value = [];
   if (canvasRef.value) {
     const ctx = canvasRef.value.getContext('2d');
     ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
   }
-  
+
   currentBoxes.value = [];
   frameIndex.value = 0;
   fps.value = 0;
   detectionTime.value = 0;
   totalObjects.value = 0;
-  
+
   ElMessage.success('摄像头检测已停止');
 };
 
-// 更新设置
 const updateSettings = () => {
-  // 设置已通过双向绑定更新
   ElMessage.info('设置已更新，下次检测生效');
 };
 
-// 处理摄像头错误
 const handleCameraError = (error) => {
   console.error('摄像头错误:', error);
-  
+
   switch (error.name) {
     case 'NotAllowedError':
       ElMessage.error('摄像头权限被拒绝，请在浏览器设置中允许访问');
@@ -411,12 +391,10 @@ const handleCameraError = (error) => {
   }
 };
 
-// 处理检测错误
 const handleDetectionError = (message) => {
   console.error('检测错误:', message);
 };
 
-// 清理资源
 onUnmounted(() => {
   stopCameraDetection();
 });

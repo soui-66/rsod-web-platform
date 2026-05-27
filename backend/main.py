@@ -4,11 +4,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.base import BaseHTTPMiddleware
 import os
 
-from database import get_db, init_db
+from database import  init_db
 from app.api import detection, validation, history, auth, camera
+from app.api.chat import router as chat_router
 
 app = FastAPI(
     title="遥感目标智能检测平台",
@@ -51,7 +51,7 @@ app.include_router(validation.router)
 app.include_router(history.router)
 app.include_router(auth.router)
 app.include_router(camera.router)
-
+app.include_router(chat_router)
 
 @app.on_event("startup")
 async def startup_event():

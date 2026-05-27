@@ -44,5 +44,9 @@ class Settings(BaseModel):
     # CORS配置
     cors_origins: list = ["*"]
 
+    # DeepSeek API配置
+    deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY", "")
+    deepseek_api_url: str = os.getenv("DEEPSEEK_API_URL", "https://api.deepseek.com/v1/chat/completions")
+
 
 settings = Settings()

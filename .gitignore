@@ -53,6 +53,7 @@ logs/
 *.tmp
 *.temp
 backend/static/*
+backend/datasets/*
 backend/uploads/*
 backend/results/*
 !backend/static/.gitkeep
