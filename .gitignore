@@ -56,6 +56,7 @@ backend/static/*
 backend/datasets/*
 backend/uploads/*
 backend/results/*
+backend/.env
 !backend/static/.gitkeep
 !backend/uploads/.gitkeep
 !backend/results/.gitkeep
