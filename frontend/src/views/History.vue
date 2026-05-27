@@ -507,8 +507,11 @@ const clearAllHistory = async () => {
  type: "warning",
  confirmButtonClass: "el-button--danger",
  });
+ const userId = getCurrentUserId();
  for (const record of records.value) {
- await axios.delete(`http://localhost:8000/api/history/${record.id}`);
+ await axios.delete(`http://localhost:8000/api/history/${record.id}`, {
+ params: { user_id: userId }
+ });
  }
  ElMessage.success("清空成功");
  fetchHistoryList();

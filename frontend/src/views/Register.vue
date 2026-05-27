@@ -132,6 +132,7 @@ const handleRegister = async () => {
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("username", result.data.username);
       localStorage.setItem("userRole", result.data.role);
+      localStorage.setItem("userInfo", JSON.stringify(result.data));
 
       setTimeout(() => {
         router.push("/");

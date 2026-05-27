@@ -1,11 +1,12 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text
+from sqlalchemy.schema import Sequence
 from datetime import datetime
 from database import Base
 
 
 class User(Base):
     __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, Sequence('users_id_seq'), primary_key=True, index=True, autoincrement=True)
     username = Column(String(50), unique=True, nullable=False)
     password = Column(String(255), nullable=False)
     role = Column(String(20), default="user")
@@ -14,7 +15,7 @@ class User(Base):
 
 class DetectionRecord(Base):
     __tablename__ = "detection_records"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, Sequence('detection_records_id_seq'), primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, nullable=True)
     file_name = Column(String(255), nullable=False)
     original_image = Column(Text, nullable=False)
@@ -31,7 +32,7 @@ class DetectionRecord(Base):
 
 class ChatRecord(Base):
     __tablename__ = "chat_records"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, Sequence('chat_records_id_seq'), primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, nullable=True)
     role = Column(String(20), nullable=False)
     content = Column(Text, nullable=False)
