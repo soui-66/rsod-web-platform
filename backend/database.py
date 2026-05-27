@@ -29,20 +29,16 @@ def get_db():
 def init_db():
     """初始化数据库"""
     try:
-        # 导入模型以确保它们被注册到 Base.metadata
-        from models import DetectionRecord, User
-        
-        # 创建所有表
+        from models import DetectionRecord, User, ChatRecord
+
         Base.metadata.create_all(bind=engine)
-        
-        # 验证表是否创建成功
+
         from sqlalchemy import inspect
         inspector = inspect(engine)
         tables = inspector.get_table_names()
-        
+
         if "detection_records" in tables:
             print("[OK] detection_records 表已创建")
-            # 检查 batch_data 字段是否存在
             columns = [col['name'] for col in inspector.get_columns('detection_records')]
             if 'batch_data' in columns:
                 print("[OK] batch_data 字段已存在")
@@ -50,11 +46,16 @@ def init_db():
                 print("[WARN] batch_data 字段不存在，需要运行迁移脚本")
         else:
             print("[ERROR] detection_records 表未创建")
-            
+
         if "users" in tables:
             print("[OK] users 表已创建")
         else:
             print("[ERROR] users 表未创建")
+
+        if "chat_records" in tables:
+            print("[OK] chat_records 表已创建")
+        else:
+            print("[ERROR] chat_records 表未创建")
             
     except Exception as e:
         print("[ERROR] 数据库初始化失败: %s" % str(e))

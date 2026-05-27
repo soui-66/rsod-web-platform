@@ -15,7 +15,7 @@ class User(Base):
 class DetectionRecord(Base):
     __tablename__ = "detection_records"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=True)  # 关联用户ID
+    user_id = Column(Integer, nullable=True)
     file_name = Column(String(255), nullable=False)
     original_image = Column(Text, nullable=False)
     result_image = Column(Text, nullable=True)
@@ -26,4 +26,13 @@ class DetectionRecord(Base):
     duration = Column(Float, default=0.0)
     max_confidence = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.now)
-    batch_data = Column(Text, nullable=True)  # 批量检测的所有图片信息
+    batch_data = Column(Text, nullable=True)
+
+
+class ChatRecord(Base):
+    __tablename__ = "chat_records"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=True)
+    role = Column(String(20), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)

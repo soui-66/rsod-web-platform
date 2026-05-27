@@ -8,6 +8,7 @@
           <span>遥感目标检测专家</span>
         </div>
       </div>
+      <el-button type="danger" size="small" @click="clearHistory">清空历史</el-button>
     </div>
 
     <div class="chat-content" ref="chatContainer">
@@ -97,7 +98,10 @@
 import { ref, nextTick, onMounted, onUnmounted } from 'vue';
 import { Message, Delete, Aim, User, ArrowRight } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
-import { chatCompletion } from '../api/detection.js';
+import { chatCompletion } from '../api/detection';
+import axios from 'axios';
+
+const API_URL = 'http://localhost:8000/api';
 
 console.log('Chat.vue loaded successfully');
 
@@ -121,6 +125,33 @@ const formatMessage = (content) => {
     .replace(/\n/g, '<br>')
     .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
     .replace(/`([^`]+)`/g, '<code>$1</code>');
+};
+
+const loadHistory = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/chat/history`);
+    if (response.data.code === 200) {
+      const history = response.data.data;
+      messages.value = history.map((msg, index) => ({
+        type: msg.role === 'assistant' ? 'ai' : 'user',
+        content: msg.content,
+        time: ''
+      }));
+    }
+  } catch (err) {
+    console.error('加载历史记录失败:', err);
+  }
+};
+
+const clearHistory = async () => {
+  try {
+    await axios.delete(`${API_URL}/chat/history`);
+    messages.value = [];
+    ElMessage.success('历史记录已清空');
+  } catch (err) {
+    console.error('清空历史记录失败:', err);
+    ElMessage.error('清空历史记录失败');
+  }
 };
 
 const clearMessages = () => {
@@ -163,26 +194,26 @@ const sendMessage = async () => {
 
     console.log('Sending to API:', JSON.stringify(apiMessages, null, 2));
 
-    const res = await chatCompletion(apiMessages);
+    const response = await chatCompletion(apiMessages);
 
-    console.log('API Response:', res);
+    console.log('API Response:', response);
 
-    if (res && res.data) {
-      const responseData = res.data;
+    if (response && response.data) {
+      const res = response.data;
 
-      if (responseData.code === 200 && responseData.data && responseData.data.content) {
-        console.log('Adding AI response:', responseData.data.content);
+      if (res.code === 200 && res.data && res.data.content) {
+        console.log('Adding AI response:', res.data.content);
         messages.value.push({
           type: 'ai',
-          content: responseData.data.content,
+          content: res.data.content,
           time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
         });
       } else {
-        console.error('Invalid response format:', responseData);
-        ElMessage.error(responseData.message || 'AI 回复失败');
+        console.error('Invalid response format:', res);
+        ElMessage.error(res.message || 'AI 回复失败');
       }
     } else {
-      console.error('Empty response:', res);
+      console.error('Empty response:', response);
       ElMessage.error('API 响应为空');
     }
   } catch (err) {
@@ -218,6 +249,7 @@ const scrollToBottom = () => {
 
 onMounted(() => {
   console.log('Chat component mounted');
+  loadHistory();
   nextTick(() => {
     scrollToBottom();
   });
@@ -241,6 +273,9 @@ onUnmounted(() => {
   background: white;
   border-bottom: 1px solid #e5e7eb;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .header-left {

@@ -1,57 +1,56 @@
-# AI 聊天接口 - 带详细日志记录
-from fastapi import APIRouter, HTTPException
+# AI 聊天接口
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
 import requests
+import json
 from datetime import datetime
 from app.config import settings
 from app.utils.logger import get_logger
+from database import get_db
+from sqlalchemy.orm import Session
+from models import ChatRecord
 
-# 创建专门的日志记录器
 logger = get_logger("ai_chat", level="DEBUG")
 
 router = APIRouter(prefix="/api/chat", tags=["AI 聊天"])
 
 
 @router.post("/completion")
-async def chat_completion(request: dict):
-    """
-    AI 聊天完成接口
-    调用 DeepSeek API 进行对话
-    """
-    request_id = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
+async def chat_completion(request: dict, db: Session = Depends(get_db)):
+    if not settings.deepseek_api_key:
+        raise HTTPException(status_code=500, detail="DeepSeek API Key 未配置")
+
+    messages = request.get("messages", [])
+
+    # 保存用户消息到数据库
+    for msg in messages:
+        existing = db.query(ChatRecord).filter(
+            ChatRecord.role == msg["role"],
+            ChatRecord.content == msg["content"]
+        ).first()
+        if not existing:
+            db.add(ChatRecord(
+                role=msg["role"],
+                content=msg["content"]
+            ))
+    db.commit()
+
+    system_prompt = {
+        "role": "system",
+        "content": """你是专业的遥感目标检测助手。
+
+项目功能：
+- 单张图像检测、批量图像检测、视频检测、摄像头实时检测
+- 支持检测：飞机、油罐、操场、建筑物、船舶、农业虫害等目标
+- 提供历史记录查看、导出、结果统计功能
+- 使用 YOLO 模型，可调节置信度阈值
+
+请简洁回答用户问题，不超过200字，仅回答遥感检测相关问题。"""
+    }
+
+    api_messages = [system_prompt] + messages
 
     try:
-        # ========== 日志：请求开始 ==========
-        logger.info(f"[REQUEST-{request_id}] AI 聊天请求开始")
-        logger.debug(f"[REQUEST-{request_id}] 请求体: {request}")
-
-        # ========== 日志：配置检查 ==========
-        if not settings.deepseek_api_key:
-            logger.error(f"[REQUEST-{request_id}] DeepSeek API Key 未配置")
-            raise HTTPException(status_code=500, detail="DeepSeek API Key 未配置")
-
-        logger.info(f"[REQUEST-{request_id}] DeepSeek API Key 已配置")
-
-        # ========== 日志：参数提取 ==========
-        messages = request.get("messages", [])
-        logger.info(f"[REQUEST-{request_id}] 消息数量: {len(messages)}")
-
-        if messages:
-            last_message = messages[-1] if messages else {}
-            logger.debug(f"[REQUEST-{request_id}] 最后一条消息: {last_message.get('content', '')[:100]}...")
-
-        # ========== 日志：构建请求 ==========
-        system_prompt = {
-            "role": "system",
-            "content": """你是一个专业的遥感目标检测助手。请回答用户关于遥感目标检测的问题。"""
-        }
-        api_messages = [system_prompt] + messages
-
-        logger.info(f"[REQUEST-{request_id}] 正在调用 DeepSeek API")
-        logger.debug(f"[REQUEST-{request_id}] API URL: {settings.deepseek_api_url}")
-
-        # ========== 日志：发送请求 ==========
-        start_time = datetime.now()
         response = requests.post(
             settings.deepseek_api_url,
             headers={
@@ -62,71 +61,65 @@ async def chat_completion(request: dict):
                 "model": "deepseek-chat",
                 "messages": api_messages,
                 "temperature": 0.7,
-                "max_tokens": 2048
+                "max_tokens": 512
             },
             timeout=60
         )
-        elapsed_time = (datetime.now() - start_time).total_seconds() * 1000
-
-        # ========== 日志：响应处理 ==========
-        logger.info(f"[REQUEST-{request_id}] API 响应状态码: {response.status_code}")
-        logger.info(f"[REQUEST-{request_id}] API 响应耗时: {elapsed_time:.2f}ms")
 
         if response.status_code != 200:
-            logger.error(f"[REQUEST-{request_id}] API 调用失败: {response.text}")
             raise HTTPException(status_code=response.status_code, detail=response.text)
 
-        # ========== 日志：解析响应 ==========
         result = response.json()
         answer = result["choices"][0]["message"]["content"]
 
-        logger.debug(f"[REQUEST-{request_id}] 响应数据: {result}")
-        logger.info(f"[REQUEST-{request_id}] AI 回答长度: {len(answer)} 字符")
-
-        # ========== 日志：请求完成 ==========
-        logger.info(f"[REQUEST-{request_id}] AI 聊天请求完成")
+        # 保存 AI 回答到数据库
+        db.add(ChatRecord(
+            role="assistant",
+            content=answer
+        ))
+        db.commit()
 
         return {
             "code": 200,
             "message": "success",
             "data": {
                 "content": answer,
-                "timestamp": datetime.now().isoformat(),
-                "request_id": request_id
+                "timestamp": datetime.now().isoformat()
             }
         }
 
-    except HTTPException as e:
-        # 已知异常
-        logger.error(f"[REQUEST-{request_id}] HTTP 异常: {e.detail}")
-        raise
-
-    except requests.exceptions.Timeout:
-        logger.error(f"[REQUEST-{request_id}] 请求超时")
-        return JSONResponse(
-            status_code=500,
-            content={"code": 500, "message": "请求超时", "request_id": request_id}
-        )
-
-    except requests.exceptions.ConnectionError:
-        logger.error(f"[REQUEST-{request_id}] 网络连接错误")
-        return JSONResponse(
-            status_code=500,
-            content={"code": 500, "message": "网络连接错误", "request_id": request_id}
-        )
-
     except Exception as e:
-        # 未知异常
-        logger.error(f"[REQUEST-{request_id}] 未知异常: {str(e)}", exc_info=True)
+        import traceback
+        traceback.print_exc()
         return JSONResponse(
             status_code=500,
-            content={"code": 500, "message": f"AI 服务调用失败: {str(e)}", "request_id": request_id}
+            content={"code": 500, "message": f"AI 服务调用失败: {str(e)}"}
         )
+
+
+@router.get("/history")
+async def get_chat_history(db: Session = Depends(get_db)):
+    records = db.query(ChatRecord).order_by(ChatRecord.created_at.asc()).all()
+
+    history = []
+    for r in records:
+        history.append({
+            "role": r.role,
+            "content": r.content
+        })
+
+    return {"code": 200, "data": history}
+
+
+@router.delete("/history")
+async def clear_chat_history(db: Session = Depends(get_db)):
+    db.query(ChatRecord).delete()
+    db.commit()
+    return {"code": 200, "message": "清空成功"}
 
 
 @router.get("/health")
 async def chat_health():
-    """检查 AI 聊天服务健康状态"""
     logger.info("AI 聊天健康检查")
 
     if not settings.deepseek_api_key:
