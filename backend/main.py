@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 from database import  init_db
-from app.api import detection, validation, history, auth, camera, categories, model_api
+from app.api import detection, validation, history, auth, camera, categories, model_api, video_detection
 from app.api.chat import router as chat_router
 
 app = FastAPI(
@@ -51,9 +51,11 @@ app.include_router(validation.router)
 app.include_router(history.router)
 app.include_router(auth.router)
 app.include_router(camera.router)
+app.include_router(video_detection.router)
 app.include_router(chat_router)
 app.include_router(categories.router)
 app.include_router(model_api.router)
+
 
 @app.on_event("startup")
 async def startup_event():

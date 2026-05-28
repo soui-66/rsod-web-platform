@@ -278,109 +278,11 @@
 
         <!-- 视频检测模式 -->
         <template v-if="currentMode === 'video'">
-          <!-- 视频上传 -->
-          <div v-if="!videoFile" class="upload-area">
-            <div class="upload-box-wrapper">
-              <el-upload
-                class="upload-box"
-                drag
-                action="#"
-                :auto-upload="false"
-                :show-file-list="false"
-                :disabled="true"
-              >
-                <div class="upload-content">
-                  <el-icon class="upload-icon"><VideoCamera /></el-icon>
-                  <p class="upload-main">点击或拖拽视频到此处</p>
-                  <p class="upload-sub">支持 MP4 / AVI / MOV 格式</p>
-                </div>
-              </el-upload>
-              <div
-                class="upload-overlay"
-                @click="triggerVideoSelect"
-              ></div>
-            </div>
-            <input
-              ref="videoFileInput"
-              type="file"
-              accept="video/*"
-              class="hidden-file-input"
-              @change="handleVideoFileChange"
-            />
-          </div>
-
-          <!-- 视频预览和检测 -->
-          <div v-else-if="!videoOutputUrl" class="video-preview">
-            <div class="batch-header">
-              <span class="batch-label">
-                <el-icon><VideoCamera /></el-icon> 待检测视频: {{ videoFile.name }}
-              </span>
-              <div class="batch-header-actions">
-                <el-button type="danger" size="small" text @click="resetVideoDetection">
-                  <el-icon><Delete /></el-icon> 移除
-                </el-button>
-              </div>
-            </div>
-            <div class="video-container">
-              <video :src="videoPreviewUrl" controls class="video-player"></video>
-            </div>
-            <el-button
-              type="primary"
-              size="large"
-              class="detect-btn"
-              :loading="videoLoading"
-              @click="handleVideoInference"
-            >
-              {{ videoLoading ? "视频检测中..." : "🚀 开始检测" }}
-            </el-button>
-          </div>
-
-          <!-- 视频检测结果 -->
-          <div v-else class="video-results">
-            <div class="batch-header">
-              <span class="batch-label">
-                <el-icon><CircleCheck /></el-icon> 视频检测完成
-              </span>
-              <div class="batch-stats">
-                <span class="stat-item">帧数: {{ videoTotalFrames }}</span>
-                <span class="stat-item">目标: {{ videoTotalTargets }}</span>
-                <span class="stat-item">耗时: {{ videoDuration }}s</span>
-              </div>
-            </div>
-            <div class="video-container result-video">
-              <video
-                :key="videoOutputUrl"
-                :src="videoOutputUrl"
-                controls
-                class="video-player result-player"
-                crossOrigin="anonymous"
-                @error="handleVideoError"
-                @loadedmetadata="handleVideoLoaded"
-              ></video>
-            </div>
-            <div class="video-info-panel">
-              <div class="info-title">检测结果摘要</div>
-              <div class="info-content">
-                <div class="info-item">
-                  <span class="info-label">处理帧数</span>
-                  <span class="info-value">{{ videoTotalFrames }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">检测目标</span>
-                  <span class="info-value">{{ videoTotalTargets }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">处理耗时</span>
-                  <span class="info-value">{{ videoDuration }}s</span>
-                </div>
-              </div>
-            </div>
-            <div class="action-buttons">
-              <el-button @click="resetVideoDetection" size="large">
-                <el-icon><Refresh /></el-icon> 重新检测
-              </el-button>
-            </div>
-          </div>
+          <!-- 使用实时视频检测组件 - 传递置信度阈值 -->
+          <VideoDetection 
+            :confidence-threshold="confidenceThreshold" 
+            @detection-update="handleVideoDetectionUpdate" 
+          />
         </template>
       </div>
 
@@ -578,6 +480,7 @@ import { ref, computed, onMounted } from "vue";
 import axios from "axios";
 import { ElMessage, ElMessageBox } from "element-plus";
 import CameraDetection from "../components/CameraDetection.vue";
+import VideoDetection from "../components/VideoDetection.vue";
 import { getUserId } from "../utils/user.js";
 import {
   Upload,
@@ -651,6 +554,13 @@ const cameraFrameIndex = ref(0);
 const cameraFps = ref(0);
 const cameraDetectionTime = ref(0);
 const cameraTotalObjects = ref(0);
+
+// 视频实时检测相关状态
+const videoDetections = ref([]);
+const videoFrameIndex = ref(0);
+const videoFps = ref(0);
+const videoDetectionTime = ref(0);
+const videoTotalObjects = ref(0);
 
 const detectionModes = [
   { key: "single", icon: "Picture", name: "单图检测", disabled: false },
@@ -817,6 +727,15 @@ const handleCameraDetectionUpdate = (data) => {
   cameraTotalObjects.value = data.totalObjects || 0;
 };
 
+// 处理视频检测更新
+const handleVideoDetectionUpdate = (data) => {
+  videoDetections.value = data.detections || [];
+  videoFrameIndex.value = data.frameIndex || 0;
+  videoFps.value = data.fps || 0;
+  videoDetectionTime.value = data.detectionTime || 0;
+  videoTotalObjects.value = data.totalObjects || 0;
+};
+
 // 获取当前模式的检测结果
 const getCurrentDetections = computed(() => {
   if (currentMode.value === 'single') {
@@ -835,6 +754,11 @@ const getCurrentDetections = computed(() => {
     });
     return allDetections;
   } else if (currentMode.value === 'video') {
+    // 视频实时检测：优先使用实时检测结果
+    if (videoDetections.value.length > 0) {
+      return videoDetections.value;
+    }
+    // 回退到完整视频检测结果
     const allDetections = [];
     videoResults.value.forEach(result => {
       if (result.detections) {
@@ -875,7 +799,13 @@ const currentInferenceTime = computed(() => {
   } else if (currentMode.value === 'batch') {
     return batchDuration.value;
   } else if (currentMode.value === 'video') {
+    // 优先使用实时检测耗时
+    if (videoDetectionTime.value > 0) {
+      return videoDetectionTime.value.toFixed(3);
+    }
     return videoDuration.value;
+  } else if (currentMode.value === 'camera') {
+    return cameraDetectionTime.value.toFixed(3);
   }
   return "0.000";
 });

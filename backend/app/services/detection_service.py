@@ -3,6 +3,9 @@ import os
 import uuid
 import json
 import base64
+import cv2
+import numpy as np
+import time
 from io import BytesIO
 from datetime import datetime
 from pathlib import Path
@@ -24,16 +27,44 @@ def get_minio_service():
 
 
 class DetectionService:
+    # 模型类型常量
+    MODEL_TYPE_RSOD = "rsod"
+    MODEL_TYPE_COCO = "coco"
+
     def __init__(self, model_path: str, base_dir: str):
         self.model = YOLO(model_path)
         self.base_dir = base_dir
         self.static_dir = os.path.join(base_dir, "static")
+        
+        # 类别名称映射字典
+        self.class_names = {
+            0: "aircraft",  # 飞机
+            1: "oiltank",   # 油罐
+            2: "overpass",  # 立交桥
+            3: "playground",# 操场
+        }
+        
+        # 当前模型类型
+        self._current_model_type = "rsod"
+        
         print("[检测服务] 初始化 MinIO 服务...")
         self.minio_service = get_minio_service()
         if self.minio_service:
             print(f"[检测服务] MinIO 服务获取成功，可用状态: {self.minio_service.is_available()}")
         else:
             print("[检测服务] MinIO 服务获取失败")
+    
+    def get_class_chinese_name(self, class_name: str) -> str:
+        """获取类别的中文名称"""
+        chinese_names = {
+            'aircraft': '飞机',
+            'oiltank': '油罐',
+            'overpass': '立交桥',
+            'playground': '操场',
+            'person': '人',
+            'car': '汽车',
+        }
+        return chinese_names.get(class_name, class_name)
 
     def detect_single_image(self, file_content: bytes, confidence_threshold: float = 0.25) -> dict:
         """单图检测"""
@@ -267,4 +298,66 @@ class DetectionService:
             "total_targets": total_targets,
             "duration": duration,
             "detections": all_detections[:200]
+        }
+
+    def detect_frame_realtime(self, image, model_name: str = "rsod-yolo11n",
+                              confidence_threshold: float = 0.25,
+                              iou_threshold: float = 0.7):
+        """
+        实时视频帧检测（不保存到数据库）
+        
+        参数:
+            image: numpy数组格式的图片
+            model_name: 模型名称
+            confidence_threshold: 置信度阈值
+            iou_threshold: IOU阈值
+        
+        返回:
+            RealtimeDetectionResult: 检测结果对象
+        """
+        # 记录检测开始时间
+        start_time = time.time()
+
+        # 调用YOLO模型进行预测
+        results = self.model.predict(
+            source=image,
+            conf=confidence_threshold,
+            iou=iou_threshold,
+            save=False  # 不保存结果图
+        )
+
+        # 解析检测结果
+        boxes = []
+        for result in results:
+            for box in result.boxes:
+                # 获取框坐标 (xyxy格式)
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+
+                # 获取置信度和类别
+                confidence = float(box.conf[0])
+                class_id = int(box.cls[0])
+                class_name = self.class_names.get(class_id, f"class_{class_id}")
+
+                # 创建DetectionBox对象
+                boxes.append({
+                    "x1": round(x1, 2),
+                    "y1": round(y1, 2),
+                    "x2": round(x2, 2),
+                    "y2": round(y2, 2),
+                    "confidence": round(confidence, 4),
+                    "class_id": class_id,
+                    "class_name": class_name,
+                    "chinese_name": self.get_class_chinese_name(class_name)
+                })
+
+        # 计算检测耗时
+        detection_time = time.time() - start_time
+
+        # 返回实时检测结果（不保存到数据库和MinIO）
+        return {
+            "total_objects": len(boxes),
+            "boxes": boxes,
+            "detection_time": round(detection_time, 4),
+            "image_width": image.shape[1] if len(image.shape) >= 2 else 0,
+            "image_height": image.shape[0] if len(image.shape) >= 2 else 0
         }

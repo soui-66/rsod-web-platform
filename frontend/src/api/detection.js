@@ -132,4 +132,17 @@ export const chatCompletion = (messages) => {
   });
 };
 
+// 实时视频帧检测 - 检测单帧
+export const detectRealtimeFrame = (data) => {
+  return request({
+    url: "/video-detection/realtime-frame",
+    method: "post",
+    data,
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    timeout: 10000, // 实时检测需要快速响应
+  });
+};
+
 export default request;

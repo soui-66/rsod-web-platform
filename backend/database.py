@@ -6,16 +6,16 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 
-# 从环境变量读取数据库配置，默认使用 PostgreSQL
-POSTGRES_USER = os.getenv("POSTGRES_USER", "rsod_user")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "rsod_password")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
-POSTGRES_DB = os.getenv("POSTGRES_DB", "rsod_db")
+# 获取后端目录路径
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+# 使用 SQLite 数据库
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'rsod.db')}"
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False}  # SQLite 特殊配置
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
