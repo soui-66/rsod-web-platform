@@ -9,6 +9,7 @@ import json
 from database import get_db
 from models import DetectionRecord
 from app.services.detection_service import DetectionService
+from app.services.category_service import update_category_count
 
 router = APIRouter(prefix="/api/inference", tags=["目标检测"])
 
@@ -77,6 +78,11 @@ async def inference_single(
         )
         db.add(record)
         db.commit()
+
+        # 从检测结果中提取类别并更新类别计数
+        if result.get("detections"):
+            category_names = [det.get("class") for det in result["detections"] if det.get("class")]
+            update_category_count(db, category_names)
 
         return {
             "code": 200,
@@ -156,6 +162,11 @@ async def inference_batch(
         )
         db.add(record)
         db.commit()
+
+        # 从检测结果中提取类别并更新类别计数
+        if batch_detections:
+            category_names = [det.get("class") for det in batch_detections if det.get("class")]
+            update_category_count(db, category_names)
 
         return {
             "code": 200,

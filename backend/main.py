@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 from database import  init_db
-from app.api import detection, validation, history, auth, camera
+from app.api import detection, validation, history, auth, camera, categories
 from app.api.chat import router as chat_router
 
 app = FastAPI(
@@ -52,11 +52,23 @@ app.include_router(history.router)
 app.include_router(auth.router)
 app.include_router(camera.router)
 app.include_router(chat_router)
+app.include_router(categories.router)
 
 @app.on_event("startup")
 async def startup_event():
     init_db()
     print("✅ 数据库初始化完成")
+    
+    # 初始化目标类别
+    try:
+        from database import SessionLocal
+        from app.services.category_service import init_categories
+        
+        db = SessionLocal()
+        result = init_categories(db)
+        print(f"✅ 目标类别初始化完成: {result['message']}")
+    except Exception as e:
+        print(f"❌ 目标类别初始化失败: {e}")
     
     # 初始化 MinIO 服务
     try:

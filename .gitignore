@@ -38,7 +38,6 @@ backend/rsod_platform.db
 *.swp
 *.swo
 *~
-
 # Node.js
 node_modules/
 dist/
@@ -53,10 +52,8 @@ logs/
 *.tmp
 *.temp
 backend/static/*
-backend/datasets/*
 backend/uploads/*
 backend/results/*
-backend/.env
 !backend/static/.gitkeep
 !backend/uploads/.gitkeep
 !backend/results/.gitkeep
@@ -74,4 +71,5 @@ Thumbs.db
 *.pth
 *.onnx
 !backend/yolo11n.pt
+datasets/
 storage/
