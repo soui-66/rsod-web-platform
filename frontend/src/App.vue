@@ -117,7 +117,7 @@ body {
 
 /* 左侧导航栏 */
 .sidebar {
-  width: 220px;
+  width: 260px;
   background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
   color: #fff;
   display: flex;
@@ -126,7 +126,7 @@ body {
 }
 
 .sidebar-logo {
-  padding: 24px 20px;
+  padding: 20px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -138,7 +138,7 @@ body {
 }
 
 .logo-text h2 {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   margin-bottom: 4px;
 }
