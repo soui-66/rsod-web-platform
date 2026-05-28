@@ -33,7 +33,7 @@ def get_db():
 def init_db():
     """初始化数据库"""
     try:
-        from models import DetectionRecord, User, ChatRecord
+        from models import DetectionRecord, User, ChatRecord, TargetCategory, ModelVersion
 
         Base.metadata.create_all(bind=engine)
 
@@ -60,6 +60,16 @@ def init_db():
             print("[OK] chat_records 表已创建")
         else:
             print("[ERROR] chat_records 表未创建")
+
+        if "target_categories" in tables:
+            print("[OK] target_categories 表已创建")
+        else:
+            print("[ERROR] target_categories 表未创建")
+
+        if "model_versions" in tables:
+            print("[OK] model_versions 表已创建")
+        else:
+            print("[ERROR] model_versions 表未创建")
             
     except Exception as e:
         print("[ERROR] 数据库初始化失败: %s" % str(e))

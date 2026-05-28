@@ -405,7 +405,7 @@
                 <span class="info-value highlight">{{ currentInferenceTime }}s</span>
               </div>
             </div>
-
+            
             <!-- 模型选择 -->
             <div class="model-selector-panel">
               <div class="model-select-row">
@@ -437,7 +437,7 @@
                 </el-button>
               </div>
             </div>
-
+            
             <!-- 置信度阈值设置 -->
             <div class="threshold-panel">
               <div class="threshold-row">
@@ -553,7 +553,7 @@
         </el-button>
       </template>
     </el-dialog>
-
+    
     <!-- 模型管理对话框 -->
     <el-dialog
       title="模型管理"
@@ -777,19 +777,19 @@ const handleDeleteModel = async (modelId, modelName) => {
         type: 'warning',
       }
     );
-
+    
     const res = await axios.delete(
       `http://localhost:8000/api/model/${modelId}`
     );
-
+    
     if (res.data.code === 200) {
       ElMessage.success("模型删除成功");
-
+      
       // 如果删除的是当前选中的模型，切换到默认模型
       if (selectedModelId.value === modelId) {
         selectedModelId.value = 0;
       }
-
+      
       // 重新加载模型列表
       loadModelList();
     } else {
@@ -1206,7 +1206,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.detection-page {
+.dection-page {
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -1295,6 +1295,82 @@ onMounted(() => {
 
 .mode-name {
   font-size: 14px;
+}
+
+/* 模型选择区 */
+.model-selector {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.model-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.model-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.model-control .el-select {
+  width: 280px;
+}
+
+/* 置信度阈值设置区 */
+.threshold-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.threshold-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.threshold-slider {
+  max-width: 400px;
+  margin-bottom: 8px;
+}
+
+.threshold-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #666;
+}
+
+.threshold-value {
+  font-weight: 600;
+  color: #667eea;
+  font-size: 15px;
+}
+
+.threshold-hint {
+  color: #999;
+  font-size: 12px;
 }
 
 /* 主内容区 */
@@ -2014,35 +2090,36 @@ onMounted(() => {
   padding: 4px 10px;
 }
 
-/* 模型选择面板 */
+/* 右侧面板模型选择样式 */
 .model-selector-panel {
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid #f0f0f0;
 }
 
 .model-select-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.model-label {
+.model-select-row .model-label {
   font-size: 13px;
-  font-weight: 500;
-  color: #666;
+  color: #999;
   white-space: nowrap;
 }
 
-.model-select {
-  width: 180px;
+.model-select-row .model-select {
+  flex: 1;
+  min-width: 140px;
+  max-width: 180px;
 }
 
-/* 置信度阈值面板 */
+/* 右侧面板置信度阈值样式 */
 .threshold-panel {
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid #f0f0f0;
 }
 
@@ -2053,13 +2130,12 @@ onMounted(() => {
   margin-bottom: 8px;
 }
 
-.threshold-label {
+.threshold-row .threshold-label {
   font-size: 13px;
-  font-weight: 500;
-  color: #666;
+  color: #999;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .threshold-value-text {
@@ -2069,40 +2145,44 @@ onMounted(() => {
 }
 
 .threshold-slider-panel {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
-.mini-slider :deep(.el-slider__track) {
-  height: 6px;
-}
-
-.mini-slider :deep(.el-slider__bar) {
-  height: 6px;
-}
-
-.mini-slider :deep(.el-slider__button) {
-  width: 16px;
-  height: 16px;
+.mini-slider {
+  width: 100%;
 }
 
 .threshold-hint {
-  font-size: 12px;
+  font-size: 11px;
   color: #999;
+  text-align: center;
+}
+
+.model-filename {
+  font-size: 11px;
+  color: #666;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 模型管理对话框样式 */
 .model-list-container {
-  max-height: 300px;
+  max-height: 400px;
   overflow-y: auto;
 }
 
 .empty-model-list {
-  text-align: center;
-  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
   color: #999;
 }
 
-.empty-text {
+.empty-model-list .empty-text {
   margin-top: 12px;
   font-size: 14px;
 }
@@ -2120,21 +2200,22 @@ onMounted(() => {
   padding: 12px;
   background: #f9fafb;
   border-radius: 8px;
+  border: 1px solid #e8ecf1;
 }
 
 .model-info {
   flex: 1;
 }
 
-.model-name {
+.model-item .model-name {
   font-size: 14px;
   font-weight: 500;
   color: #333;
+  margin-bottom: 4px;
 }
 
-.model-file-name {
+.model-item .model-file-name {
   font-size: 12px;
   color: #999;
-  margin-top: 4px;
 }
 </style>

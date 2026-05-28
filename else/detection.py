@@ -9,13 +9,11 @@ import json
 from database import get_db
 from models import DetectionRecord, ModelVersion
 from app.services.detection_service import DetectionService
-from app.services.category_service import update_category_count
 
 router = APIRouter(prefix="/api/inference", tags=["目标检测"])
 
 # 获取BASE_DIR
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# 回到backend目录: backend/app/api -> backend/app -> backend
 BASE_DIR = os.path.dirname(BASE_DIR)
 BASE_DIR = os.path.dirname(BASE_DIR)
 
@@ -60,42 +58,31 @@ def get_detection_service(model_id: int = None, db: Session = None):
 
 @router.post("/single")
 async def inference_single(
-    file: UploadFile = File(...),
-    confidence_threshold: float = Form(0.25),
-    user_id: int = Form(None),
-    selected_model_id: int = Form(None),
-    db: Session = Depends(get_db)
+        file: UploadFile = File(...),
+        confidence_threshold: float = Form(0.25),
+        user_id: int = Form(None),
+        selected_model_id: int = Form(None),
+        db: Session = Depends(get_db)
 ):
-    """
-    单图目标检测接口
-
-    上传一张图片，返回检测结果和标注后的图片
-    
-    :param confidence_threshold: 置信度阈值，范围0-1，低于此阈值的检测结果将被过滤
-    :param user_id: 用户ID，用于关联检测记录
-    :param selected_model_id: 选择的模型ID，0或不传使用默认模型
-    """
+    """单图目标检测接口"""
     print(f"\n[检测接口] 收到单图检测请求")
     print(f"[检测接口] 文件名: {file.filename}")
     print(f"[检测接口] 用户ID: {user_id}")
     print(f"[检测接口] 模型ID: {selected_model_id}")
     print(f"[检测接口] 置信度阈值: {confidence_threshold}")
-    
+
     try:
-        # 读取图片
         file_content = await file.read()
         print(f"[检测接口] 文件大小: {len(file_content)} bytes")
 
-        # 获取检测服务（支持多模型）
         service_data = get_detection_service(selected_model_id, db)
         service = service_data['service']
         model_name = service_data['model_name']
         print(f"[检测接口] 检测服务获取成功，模型: {model_name}")
-        
+
         result = service.detect_single_image(file_content, confidence_threshold=confidence_threshold)
         print(f"[检测接口] 检测完成，目标数量: {result['target_count']}")
 
-        # 存入数据库
         record = DetectionRecord(
             user_id=user_id,
             file_name=file.filename,
@@ -110,11 +97,6 @@ async def inference_single(
         )
         db.add(record)
         db.commit()
-
-        # 从检测结果中提取类别并更新类别计数
-        if result.get("detections"):
-            category_names = [det.get("class") for det in result["detections"] if det.get("class")]
-            update_category_count(db, category_names)
 
         return {
             "code": 200,
@@ -145,21 +127,13 @@ async def inference_single(
 
 @router.post("/batch")
 async def inference_batch(
-    files: list[UploadFile] = File(...),
-    confidence_threshold: float = Form(0.25),
-    user_id: int = Form(None),
-    selected_model_id: int = Form(None),
-    db: Session = Depends(get_db)
+        files: list[UploadFile] = File(...),
+        confidence_threshold: float = Form(0.25),
+        user_id: int = Form(None),
+        selected_model_id: int = Form(None),
+        db: Session = Depends(get_db)
 ):
-    """
-    批量目标检测接口
-
-    上传多张图片，返回所有图片的检测结果
-    
-    :param confidence_threshold: 置信度阈值，范围0-1，低于此阈值的检测结果将被过滤
-    :param user_id: 用户ID，用于关联检测记录
-    :param selected_model_id: 选择的模型ID，0或不传使用默认模型
-    """
+    """批量目标检测接口"""
     try:
         start_time = datetime.now()
 
@@ -189,7 +163,6 @@ async def inference_batch(
 
         duration = (datetime.now() - start_time).total_seconds()
 
-        # 存入数据库
         record = DetectionRecord(
             user_id=user_id,
             file_name=f"批量检测_{len(files)}张",
@@ -205,11 +178,6 @@ async def inference_batch(
         )
         db.add(record)
         db.commit()
-
-        # 从检测结果中提取类别并更新类别计数
-        if batch_detections:
-            category_names = [det.get("class") for det in batch_detections if det.get("class")]
-            update_category_count(db, category_names)
 
         return {
             "code": 200,
@@ -239,34 +207,23 @@ async def inference_batch(
 
 @router.post("/video")
 async def inference_video(
-    video: UploadFile = File(...),
-    confidence_threshold: float = Form(0.25),
-    user_id: int = Form(None),
-    selected_model_id: int = Form(None),
-    db: Session = Depends(get_db)
+        video: UploadFile = File(...),
+        confidence_threshold: float = Form(0.25),
+        user_id: int = Form(None),
+        selected_model_id: int = Form(None),
+        db: Session = Depends(get_db)
 ):
-    """
-    视频目标检测接口
-
-    对视频的每一帧进行目标检测，输出带有识别框的完整视频
-    
-    :param confidence_threshold: 置信度阈值，范围0-1，低于此阈值的检测结果将被过滤
-    :param user_id: 用户ID，用于关联检测记录
-    :param selected_model_id: 选择的模型ID，0或不传使用默认模型
-    """
+    """视频目标检测接口"""
     try:
         service_data = get_detection_service(selected_model_id, db)
         service = service_data['service']
         model_name = service_data['model_name']
 
-        # 读取视频内容
         video_content = await video.read()
         video_filename = video.filename or "video_detection"
 
-        # 执行视频检测
         result = service.detect_video(video_content, video_filename, confidence_threshold=confidence_threshold)
 
-        # 存入数据库
         record = DetectionRecord(
             user_id=user_id,
             file_name=video_filename,
@@ -281,11 +238,6 @@ async def inference_video(
         )
         db.add(record)
         db.commit()
-
-        # 从检测结果中提取类别并更新类别计数
-        if result.get("detections"):
-            category_names = [det.get("class") for det in result["detections"] if det.get("class")]
-            update_category_count(db, category_names)
 
         return {
             "code": 200,

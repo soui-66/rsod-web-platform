@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.schema import Sequence
 from datetime import datetime
 from database import Base
@@ -28,16 +28,6 @@ class DetectionRecord(Base):
     max_confidence = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.now)
     batch_data = Column(Text, nullable=True)
-
-
-class TargetCategory(Base):
-    __tablename__ = "target_categories"
-    id = Column(Integer, Sequence('target_categories_id_seq'), primary_key=True, index=True, autoincrement=True)
-    name = Column(String(50), unique=True, nullable=False)
-    description = Column(String(255), nullable=True)
-    color = Column(String(20), default="#1890ff")
-    count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.now)
 
 
 class ChatRecord(Base):
