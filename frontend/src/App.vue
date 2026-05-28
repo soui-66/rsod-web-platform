@@ -74,7 +74,6 @@ const menuItems = ref([
   { path: "/", icon: "🎯", label: "智能检测" },
   { path: "/history", icon: "📋", label: "历史记录" },
   { path: "/ai-chat", icon: "💬", label: "AI 问答" },
-  { path: "/targets", icon: "📊", label: "目标库" },
   { path: "/profile", icon: "👤", label: "个人中心" },
 ]);
 

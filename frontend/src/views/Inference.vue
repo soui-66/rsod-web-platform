@@ -488,22 +488,6 @@
               </div>
             </div>
           </div>
-
-          <div class="card-section">
-            <h3 class="section-title">
-              <el-icon><MagicStick /></el-icon> AI 诊断建议
-            </h3>
-            <div class="ai-advice">
-              <template v-if="getCurrentDetections.length > 0">
-                <p>检测到 <strong>{{ getCurrentDetections.length }}</strong> 个目标</p>
-                <p>最高置信度：<strong>{{ currentMaxConfidence }}%</strong></p>
-                <p>最低置信度：<strong>{{ currentMinConfidence }}%</strong></p>
-              </template>
-              <template v-else>
-                <p>上传图片即可开始检测</p>
-              </template>
-            </div>
-          </div>
         </div>
       </div>
     </div>
