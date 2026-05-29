@@ -5,17 +5,33 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 # 获取后端目录路径
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 使用 SQLite 数据库
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'rsod.db')}"
+# 优先从环境变量读取数据库配置
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False}  # SQLite 特殊配置
-)
+if DATABASE_URL:
+    # 使用环境变量配置的数据库
+    SQLALCHEMY_DATABASE_URL = DATABASE_URL
+else:
+    # 默认使用 SQLite 数据库
+    SQLALCHEMY_DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'rsod.db')}"
+    print(f"[数据库配置] 使用默认 SQLite 数据库: {SQLALCHEMY_DATABASE_URL}")
+
+# 创建引擎
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL,
+        connect_args={"check_same_thread": False}  # SQLite 特殊配置
+    )
+else:
+    engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

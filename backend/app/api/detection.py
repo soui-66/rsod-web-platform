@@ -114,7 +114,12 @@ async def inference_single(
         # 从检测结果中提取类别并更新类别计数
         if result.get("detections"):
             category_names = [det.get("class") for det in result["detections"] if det.get("class")]
-            update_category_count(db, category_names)
+            print(f"[检测接口] 提取到类别: {category_names}")
+            if category_names:
+                update_result = update_category_count(db, category_names)
+                print(f"[检测接口] 类别更新结果: {update_result}")
+            else:
+                print("[检测接口] 没有提取到有效类别")
 
         return {
             "code": 200,
@@ -237,6 +242,32 @@ async def inference_batch(
         )
 
 
+@router.post("/test-category-update")
+async def test_category_update(db: Session = Depends(get_db)):
+    """测试类别更新功能"""
+    before_counts = {}
+    for name in ['aircraft', 'oiltank', 'overpass', 'playground']:
+        cat = db.query(TargetCategory).filter(TargetCategory.name == name).first()
+        before_counts[name] = cat.count if cat else 0
+    
+    update_result = update_category_count(db, ['aircraft', 'oiltank'])
+    
+    after_counts = {}
+    for name in ['aircraft', 'oiltank', 'overpass', 'playground']:
+        cat = db.query(TargetCategory).filter(TargetCategory.name == name).first()
+        after_counts[name] = cat.count if cat else 0
+    
+    return {
+        "code": 200,
+        "message": "测试完成",
+        "data": {
+            "before": before_counts,
+            "after": after_counts,
+            "update_result": update_result
+        }
+    }
+
+
 @router.post("/video")
 async def inference_video(
     video: UploadFile = File(...),
@@ -285,7 +316,12 @@ async def inference_video(
         # 从检测结果中提取类别并更新类别计数
         if result.get("detections"):
             category_names = [det.get("class") for det in result["detections"] if det.get("class")]
-            update_category_count(db, category_names)
+            print(f"[检测接口] 提取到类别: {category_names}")
+            if category_names:
+                update_result = update_category_count(db, category_names)
+                print(f"[检测接口] 类别更新结果: {update_result}")
+            else:
+                print("[检测接口] 没有提取到有效类别")
 
         return {
             "code": 200,

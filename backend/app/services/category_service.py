@@ -65,28 +65,40 @@ def update_category_count(db: Session, category_names: list):
     :param category_names: 检测到的类别名称列表
     """
     try:
+        print(f"[类别更新] 开始处理 {len(category_names)} 个类别")
+        
         for name in category_names:
+            if not name:
+                print(f"[类别更新] 跳过空类别名称")
+                continue
+                
             # 先尝试获取已有类别
             category = db.query(TargetCategory).filter(TargetCategory.name == name).first()
             
             if category:
                 # 更新计数
                 category.count = category.count + 1
-                print(f"[OK] 更新类别计数: {name} -> {category.count}")
+                print(f"[类别更新] 更新类别计数: {name} -> {category.count}")
             else:
-                # 自动添加新类别
-                result = add_category(db, name)
-                if result["status"] == "success":
-                    # 设置初始计数为1
-                    category = db.query(TargetCategory).filter(TargetCategory.name == name).first()
-                    category.count = 1
+                # 自动添加新类别并设置初始计数为1
+                print(f"[类别更新] 添加新类别: {name}")
+                category = TargetCategory(
+                    name=name,
+                    count=1,
+                    color=f"#{hex(hash(name) % 16777215)[2:].zfill(6)}"
+                )
+                db.add(category)
+                print(f"[类别更新] 新类别 '{name}' 添加成功")
         
         db.commit()
+        print(f"[类别更新] 成功更新 {len(category_names)} 个类别计数")
         return {"status": "success", "message": f"更新了 {len(category_names)} 个类别计数"}
     
     except Exception as e:
         db.rollback()
         print(f"[ERROR] 更新类别计数失败: {e}")
+        import traceback
+        traceback.print_exc()
         return {"status": "error", "message": str(e)}
 
 
