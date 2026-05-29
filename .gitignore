@@ -61,7 +61,7 @@ backend/results/*
 # 环境变量
 .env.local
 .env.*.local
-
+.env
 # 操作系统
 .DS_Store
 Thumbs.db
